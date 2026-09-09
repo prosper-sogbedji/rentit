@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'profile_screen.dart';
+import '../../../main.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -33,7 +33,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!mounted) return;
     setState(() => _isLoading = false);
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const ProfileScreen()),
+      MaterialPageRoute(builder: (_) => const MainShell()),
     );
   }
 

@@ -10,7 +10,6 @@ class ExploreScreen extends StatefulWidget {
 
 class _ExploreScreenState extends State<ExploreScreen> {
   int _selectedCategoryIndex = 0;
-  int _selectedNavIndex = 0;
 
   final List<Map<String, dynamic>> _categories = [
     {'label': 'All', 'icon': Icons.apps},
@@ -31,6 +30,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       'color': const Color(0xFFFFF7ED),
       'icon': Icons.construction,
       'iconColor': const Color(0xFFF59E0B),
+      'image': 'assets/images/drill.jpg',
       'badge': 'Featured',
     },
     {
@@ -43,6 +43,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       'color': const Color(0xFFEFF6FF),
       'icon': Icons.camera_alt_outlined,
       'iconColor': const Color(0xFF2563EB),
+      'image': 'assets/images/camera.jpg',
       'badge': 'Featured',
     },
   ];
@@ -58,6 +59,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       'color': const Color(0xFFEFF6FF),
       'icon': Icons.camera_alt_outlined,
       'iconColor': const Color(0xFF2563EB),
+      'image': 'assets/images/camera.jpg',
       'badge': 'Featured',
     },
     {
@@ -70,6 +72,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       'color': const Color(0xFFF0FDF4),
       'icon': Icons.terrain_outlined,
       'iconColor': const Color(0xFF059669),
+      'image': 'assets/images/tent.jpg',
       'badge': 'Featured',
     },
   ];
@@ -86,6 +89,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       'icon': Icons.build_outlined,
       'color': const Color(0xFFFFF7ED),
       'iconColor': const Color(0xFFF59E0B),
+      'image': 'assets/images/toolkit.jpg',
     },
     {
       'id': 'item_6',
@@ -98,6 +102,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       'icon': Icons.directions_bike_outlined,
       'color': const Color(0xFFEFF6FF),
       'iconColor': const Color(0xFF2563EB),
+      'image': 'assets/images/bike.jpg',
     },
   ];
 
@@ -188,11 +193,23 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     ),
                   ),
                   child: Center(
-                    child: Icon(
-                      item['icon'] as IconData,
-                      size: 56,
-                      color: item['iconColor'] as Color,
-                    ),
+                    child: item['image'] != null
+                        ? ClipRRect(
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(18),
+                            ),
+                            child: Image.asset(
+                              item['image'] as String,
+                              width: double.infinity,
+                              height: 130,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : Icon(
+                            item['icon'] as IconData,
+                            size: 56,
+                            color: item['iconColor'] as Color,
+                          ),
                   ),
                 ),
                 // Badge
@@ -368,11 +385,23 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     ),
                   ),
                   child: Center(
-                    child: Icon(
-                      item['icon'] as IconData,
-                      size: 44,
-                      color: item['iconColor'] as Color,
-                    ),
+                    child: item['image'] != null
+                        ? ClipRRect(
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(16),
+                            ),
+                            child: Image.asset(
+                              item['image'] as String,
+                              width: double.infinity,
+                              height: 110,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : Icon(
+                            item['icon'] as IconData,
+                            size: 44,
+                            color: item['iconColor'] as Color,
+                          ),
                   ),
                 ),
                 Positioned(
@@ -530,11 +559,21 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 color: item['color'] as Color,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(
-                item['icon'] as IconData,
-                color: item['iconColor'] as Color,
-                size: 28,
-              ),
+              child: item['image'] != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.asset(
+                        item['image'] as String,
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  : Icon(
+                      item['icon'] as IconData,
+                      color: item['iconColor'] as Color,
+                      size: 28,
+                    ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -856,7 +895,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       crossAxisCount: 2,
                       crossAxisSpacing: 12,
                       mainAxisSpacing: 12,
-                      childAspectRatio: 0.82,
+                      childAspectRatio: 0.72,
                       children: _trendingItems
                           .map((item) => _buildTrendingCard(item))
                           .toList(),
@@ -911,37 +950,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedNavIndex,
-        onTap: (i) => setState(() => _selectedNavIndex = i),
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
-        selectedItemColor: const Color(0xFF2563EB),
-        unselectedItemColor: const Color(0xFF94A3B8),
-        selectedFontSize: 11,
-        unselectedFontSize: 11,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'Explore',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.search),
-            label: 'Search',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_today_outlined),
-            activeIcon: Icon(Icons.calendar_today),
-            label: 'Rentals',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
-      ),
+      // BottomNavigationBar managed by MainShell
     );
   }
 }

@@ -95,16 +95,27 @@ class RentalCard extends StatelessWidget {
                     height: 90,
                     color: const Color(0xFFF1F5F9),
                     child: itemImageUrl.isNotEmpty
-                        ? Image.network(
-                            itemImageUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                const Icon(
-                              Icons.construction,
-                              color: Color(0xFF94A3B8),
-                              size: 40,
-                            ),
-                          )
+                        ? (itemImageUrl.startsWith('assets/')
+                            ? Image.asset(
+                                itemImageUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    const Icon(
+                                  Icons.construction,
+                                  color: Color(0xFF94A3B8),
+                                  size: 40,
+                                ),
+                              )
+                            : Image.network(
+                                itemImageUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    const Icon(
+                                  Icons.construction,
+                                  color: Color(0xFF94A3B8),
+                                  size: 40,
+                                ),
+                              ))
                         : const Icon(
                             Icons.construction,
                             color: Color(0xFF94A3B8),

@@ -427,13 +427,28 @@ class _ReservationScreenState extends State<ReservationScreen> {
                               const Color(0xFFFFF7ED),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Icon(
-                          (widget.item['icon'] as IconData?) ??
-                              Icons.construction,
-                          color: (widget.item['iconColor'] as Color?) ??
-                              const Color(0xFFF59E0B),
-                          size: 26,
-                        ),
+                        child: widget.item['image'] != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: widget.item['image'].startsWith('assets/')
+                                    ? Image.asset(
+                                        widget.item['image'],
+                                        fit: BoxFit.cover,
+                                      )
+                                    : Image.network(
+                                        widget.item['image'],
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) =>
+                                            const Icon(Icons.error, color: Colors.grey),
+                                      ),
+                              )
+                            : Icon(
+                                (widget.item['icon'] as IconData?) ??
+                                    Icons.construction,
+                                color: (widget.item['iconColor'] as Color?) ??
+                                    const Color(0xFFF59E0B),
+                                size: 26,
+                              ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(

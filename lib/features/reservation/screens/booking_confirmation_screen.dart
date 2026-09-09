@@ -253,12 +253,27 @@ class BookingConfirmationScreen extends StatelessWidget {
                               const Color(0xFFFFF7ED),
                           borderRadius: BorderRadius.circular(14),
                         ),
-                        child: Icon(
-                          (item['icon'] as IconData?) ?? Icons.construction,
-                          color: (item['iconColor'] as Color?) ??
-                              const Color(0xFFF59E0B),
-                          size: 30,
-                        ),
+                        child: item['image'] != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(14),
+                                child: item['image'].startsWith('assets/')
+                                    ? Image.asset(
+                                        item['image'],
+                                        fit: BoxFit.cover,
+                                      )
+                                    : Image.network(
+                                        item['image'],
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) =>
+                                            const Icon(Icons.error, color: Colors.grey),
+                                      ),
+                              )
+                            : Icon(
+                                (item['icon'] as IconData?) ?? Icons.construction,
+                                color: (item['iconColor'] as Color?) ??
+                                    const Color(0xFFF59E0B),
+                                size: 30,
+                              ),
                       ),
                       const SizedBox(width: 14),
                       Expanded(

@@ -13,7 +13,6 @@ class MyRentalsScreen extends StatefulWidget {
 class _MyRentalsScreenState extends State<MyRentalsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  int _selectedNavIndex = 2; // "Rentals" selected
 
   // Mock data matching the design before Firebase integration
   final List<RentalModel> _allRentals = [
@@ -111,7 +110,11 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
           ownerName: rental.status == 'active'
               ? 'Sarah J.'
               : (rental.status == 'pending' ? 'David L.' : 'Marc A.'),
-          itemImageUrl: '',
+          itemImageUrl: rental.status == 'active'
+              ? 'assets/images/drill.jpg'
+              : (rental.status == 'pending'
+                  ? 'assets/images/camera.jpg'
+                  : 'assets/images/jackhammer.jpg'),
           onTap: () {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -293,42 +296,7 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
           ],
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedNavIndex,
-        onTap: (index) {
-          setState(() {
-            _selectedNavIndex = index;
-          });
-        },
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
-        selectedItemColor: const Color(0xFF2563EB),
-        unselectedItemColor: const Color(0xFF94A3B8),
-        selectedFontSize: 11,
-        unselectedFontSize: 11,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'Explore',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.search),
-            activeIcon: Icon(Icons.search),
-            label: 'Search',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_today_outlined),
-            activeIcon: Icon(Icons.calendar_today),
-            label: 'Rentals',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
-      ),
+      // BottomNavigationBar managed by MainShell
     );
   }
 }

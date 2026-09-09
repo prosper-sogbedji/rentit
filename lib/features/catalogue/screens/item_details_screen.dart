@@ -58,6 +58,7 @@ class ItemDetailsScreen extends StatelessWidget {
     final Color bgColor = (item['color'] as Color?) ?? const Color(0xFFFFF7ED);
     final IconData icon = (item['icon'] as IconData?) ?? Icons.construction;
     final Color iconColor = (item['iconColor'] as Color?) ?? const Color(0xFFF59E0B);
+    final String? image = item['image'] as String?;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -142,7 +143,14 @@ class ItemDetailsScreen extends StatelessWidget {
                     child: Stack(
                       children: [
                         Center(
-                          child: Icon(icon, size: 100, color: iconColor),
+                          child: image != null
+                              ? Image.asset(
+                                  image,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  fit: BoxFit.cover,
+                                )
+                              : Icon(icon, size: 100, color: iconColor),
                         ),
                         // Top Rated badge
                         Positioned(
