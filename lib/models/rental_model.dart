@@ -4,7 +4,7 @@ class RentalModel {
   final String itemId;
   final DateTime startDate;
   final DateTime endDate;
-  final int duration; // in days
+  final int duration; // in hours
   final double totalPrice;
   final String status; // 'pending', 'confirmed', 'completed', 'cancelled'
   final DateTime createdAt;
