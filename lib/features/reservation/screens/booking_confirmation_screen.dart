@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../../../models/item_model.dart';
 import '../../../models/rental_model.dart';
 
 class BookingConfirmationScreen extends StatelessWidget {
-  final Map<String, dynamic> item;
+  final ItemModel item;
   final DateTime selectedDate;
   final int startHour;
   final int durationHours;
@@ -23,23 +25,11 @@ class BookingConfirmationScreen extends StatelessWidget {
 
   // ── Helpers ────────────────────────────────────────────
   String _formatHour(int hour) {
-    final h = hour % 24;
-    final period = h < 12 ? 'AM' : 'PM';
-    final display = h == 0 ? 12 : (h > 12 ? h - 12 : h);
-    return '$display:00 $period';
+    return DateFormat('h:mm a').format(DateTime(2000, 1, 1, hour % 24));
   }
 
   String _formatDate(DateTime d) {
-    const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December',
-    ];
-    const days = [
-      'Monday', 'Tuesday', 'Wednesday', 'Thursday',
-      'Friday', 'Saturday', 'Sunday',
-    ];
-    final weekday = days[d.weekday - 1];
-    return '$weekday, ${months[d.month - 1]} ${d.day}';
+    return DateFormat('EEEE, MMMM d').format(d);
   }
 
   int get _endHour => (startHour + durationHours).clamp(0, 48);
@@ -56,12 +46,12 @@ class BookingConfirmationScreen extends StatelessWidget {
     return RentalModel(
       id: 'booking_${now.millisecondsSinceEpoch}',
       userId: 'user_current',
-      itemId: (item['id'] as String?) ?? 'item_unknown',
+      itemId: item.id,
       startDate: start,
       endDate: end,
       duration: durationHours,
       totalPrice: totalPrice,
-      status: 'pending',
+      status: RentalStatus.pending,
       createdAt: now,
     );
   }
@@ -114,6 +104,17 @@ class BookingConfirmationScreen extends StatelessWidget {
     );
   }
 
+  double get _pricePerHour => item.pricePerDay / 24;
+
+  Color get _itemColor => const Color(0xFFFFF7ED);
+  IconData get _itemIcon => switch (item.categoryId) {
+    'tools' => Icons.build_rounded,
+    'electronics' => Icons.devices_rounded,
+    'vehicles' => Icons.directions_car_rounded,
+    _ => Icons.inventory_2_rounded,
+  };
+  Color get _itemIconColor => const Color(0xFFF59E0B);
+
   Widget _buildPriceLine({
     required String label,
     required String value,
@@ -127,9 +128,7 @@ class BookingConfirmationScreen extends StatelessWidget {
           style: TextStyle(
             fontSize: isTotal ? 16 : 14,
             fontWeight: isTotal ? FontWeight.w800 : FontWeight.w500,
-            color: isTotal
-                ? const Color(0xFF0F172A)
-                : const Color(0xFF475569),
+            color: isTotal ? const Color(0xFF0F172A) : const Color(0xFF475569),
           ),
         ),
         Text(
@@ -137,9 +136,57 @@ class BookingConfirmationScreen extends StatelessWidget {
           style: TextStyle(
             fontSize: isTotal ? 20 : 14,
             fontWeight: FontWeight.w700,
-            color: isTotal
-                ? const Color(0xFF2563EB)
-                : const Color(0xFF0F172A),
+            color: isTotal ? const Color(0xFF2563EB) : const Color(0xFF0F172A),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStepHeader() {
+    return Row(
+      children: [
+        _buildStep(number: '1', label: 'Schedule'),
+        Expanded(child: Container(height: 1, color: const Color(0xFF2563EB))),
+        _buildStep(number: '2', label: 'Confirm', active: true),
+      ],
+    );
+  }
+
+  Widget _buildStep({
+    required String number,
+    required String label,
+    bool active = false,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: active ? const Color(0xFF2563EB) : Colors.white,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: active ? const Color(0xFF2563EB) : const Color(0xFFCBD5E1),
+            ),
+          ),
+          child: Text(
+            number,
+            style: TextStyle(
+              color: active ? Colors.white : const Color(0xFF64748B),
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const SizedBox(width: 7),
+        Text(
+          label,
+          style: TextStyle(
+            color: active ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ],
@@ -150,20 +197,17 @@ class BookingConfirmationScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     // Build (but don't yet persist) the rental
     final rental = _buildRentalModel();
-    final itemName = (item['name'] as String?) ?? 'Pro Cordless Drill';
+    final itemName = item.name;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text(
-          'Confirm Booking',
+          'Review your booking',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
@@ -174,21 +218,23 @@ class BookingConfirmationScreen extends StatelessWidget {
       body: Stack(
         children: [
           SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 120),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 128),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                _buildStepHeader(),
+                const SizedBox(height: 22),
 
                 // ── Booking status banner ──
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Row(
                     children: [
@@ -230,11 +276,11 @@ class BookingConfirmationScreen extends StatelessWidget {
 
                 // ── Item Card ──
                 Container(
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.04),
@@ -246,19 +292,13 @@ class BookingConfirmationScreen extends StatelessWidget {
                   child: Row(
                     children: [
                       Container(
-                        width: 64,
-                        height: 64,
+                        width: 68,
+                        height: 68,
                         decoration: BoxDecoration(
-                          color: (item['color'] as Color?) ??
-                              const Color(0xFFFFF7ED),
+                          color: _itemColor,
                           borderRadius: BorderRadius.circular(14),
                         ),
-                        child: Icon(
-                          (item['icon'] as IconData?) ?? Icons.construction,
-                          color: (item['iconColor'] as Color?) ??
-                              const Color(0xFFF59E0B),
-                          size: 30,
-                        ),
+                        child: Icon(_itemIcon, color: _itemIconColor, size: 30),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -299,7 +339,7 @@ class BookingConfirmationScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            '\$${((item['price'] as int?) ?? 35).toStringAsFixed(0)}',
+                            '\$${_pricePerHour.toStringAsFixed(0)}',
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
@@ -335,7 +375,7 @@ class BookingConfirmationScreen extends StatelessWidget {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(18),
                     border: Border.all(color: const Color(0xFFE2E8F0)),
                   ),
                   child: Column(
@@ -395,14 +435,14 @@ class BookingConfirmationScreen extends StatelessWidget {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(18),
                     border: Border.all(color: const Color(0xFFE2E8F0)),
                   ),
                   child: Column(
                     children: [
                       _buildPriceLine(
                         label:
-                            '\$${((item['price'] as int?) ?? 35)} × $durationHours ${durationHours == 1 ? "hour" : "hours"}',
+                            '\$${_pricePerHour.toStringAsFixed(0)} × $durationHours ${durationHours == 1 ? "hour" : "hours"}',
                         value: '\$${subtotal.toStringAsFixed(2)}',
                       ),
                       const SizedBox(height: 12),
@@ -575,10 +615,7 @@ class _SuccessDialog extends StatelessWidget {
             Text(
               itemName,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF64748B),
-              ),
+              style: const TextStyle(fontSize: 14, color: Color(0xFF64748B)),
             ),
             const SizedBox(height: 18),
             Container(
@@ -593,8 +630,12 @@ class _SuccessDialog extends StatelessWidget {
                   const SizedBox(height: 8),
                   _row('Time', '$startTime → $endTime'),
                   const SizedBox(height: 8),
-                  _row('Total', '\$${total.toStringAsFixed(2)}',
-                      bold: true, highlight: true),
+                  _row(
+                    'Total',
+                    '\$${total.toStringAsFixed(2)}',
+                    bold: true,
+                    highlight: true,
+                  ),
                 ],
               ),
             ),
@@ -628,8 +669,12 @@ class _SuccessDialog extends StatelessWidget {
     );
   }
 
-  Widget _row(String label, String value,
-      {bool bold = false, bool highlight = false}) {
+  Widget _row(
+    String label,
+    String value, {
+    bool bold = false,
+    bool highlight = false,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [

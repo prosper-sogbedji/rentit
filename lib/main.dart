@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:rentit/features/reservation/screens/reservation_screen.dart';
+import 'package:rentit/models/item_model.dart';
 
 void main() {
   runApp(const MyApp());
@@ -10,6 +12,17 @@ class MyApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
+    final demoItem = ItemModel(
+      id: 'item_cordless_drill_001',
+      name: 'Pro Cordless Drill',
+      description: 'A cordless drill for home improvement projects.',
+      categoryId: 'tools',
+      imageUrl: '',
+      pricePerDay: 840,
+      quantity: 1,
+      createdAt: DateTime(2026, 1, 1),
+    );
+
     return MaterialApp(
       title: 'Flutter Demo',
       theme: ThemeData(
@@ -30,7 +43,7 @@ class MyApp extends StatelessWidget {
         // tested with just a hot reload.
         colorScheme: .fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: ReservationScreen(item: demoItem),
     );
   }
 }
