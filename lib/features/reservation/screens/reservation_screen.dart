@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../../../models/item_model.dart';
 import 'booking_confirmation_screen.dart';
 
 class ReservationScreen extends StatefulWidget {
-  final Map<String, dynamic> item;
+  final ItemModel item;
 
   const ReservationScreen({super.key, required this.item});
 
@@ -23,42 +25,106 @@ class _ReservationScreenState extends State<ReservationScreen> {
   int get _endHour => (_startHour + _durationHours).clamp(0, 48);
 
   double get _pricePerHour {
-    return ((widget.item['price'] as int?) ?? 35).toDouble();
+    return widget.item.pricePerDay / 24;
   }
 
+  Color get _itemColor => const Color(0xFFFFF7ED);
+  IconData get _itemIcon => switch (widget.item.categoryId) {
+    'tools' => Icons.build_rounded,
+    'electronics' => Icons.devices_rounded,
+    'vehicles' => Icons.directions_car_rounded,
+    _ => Icons.inventory_2_rounded,
+  };
+  Color get _itemIconColor => const Color(0xFFF59E0B);
+
   double get _rentalSubtotal => _pricePerHour * _durationHours;
-  double get _serviceFee => double.parse((_rentalSubtotal * 0.12).toStringAsFixed(2));
+  double get _serviceFee =>
+      double.parse((_rentalSubtotal * 0.12).toStringAsFixed(2));
   double get _total => _rentalSubtotal + _serviceFee;
 
   String _formatHour(int hour) {
-    final h = hour % 24;
-    final period = h < 12 ? 'AM' : 'PM';
-    final display = h == 0 ? 12 : (h > 12 ? h - 12 : h);
-    return '$display:00 $period';
+    return DateFormat('h:mm a').format(DateTime(2000, 1, 1, hour % 24));
   }
 
   String _formatDate(DateTime d) {
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    final weekday = days[d.weekday - 1];
-    return '$weekday, ${months[d.month - 1]} ${d.day}, ${d.year}';
+    return DateFormat('EEE, MMM d, y').format(d);
   }
 
   // ── Build helpers ──────────────────────────────────────
   Widget _buildSectionTitle(String title) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w800,
-          color: Color(0xFF0F172A),
-        ),
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 18,
+            decoration: BoxDecoration(
+              color: const Color(0xFF2563EB),
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildStepHeader() {
+    return Row(
+      children: [
+        _buildStep(number: '1', label: 'Schedule', active: true),
+        Expanded(child: Container(height: 1, color: const Color(0xFFBFDBFE))),
+        _buildStep(number: '2', label: 'Confirm'),
+      ],
+    );
+  }
+
+  Widget _buildStep({
+    required String number,
+    required String label,
+    bool active = false,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: active ? const Color(0xFF2563EB) : Colors.white,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: active ? const Color(0xFF2563EB) : const Color(0xFFCBD5E1),
+            ),
+          ),
+          child: Text(
+            number,
+            style: TextStyle(
+              color: active ? Colors.white : const Color(0xFF94A3B8),
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const SizedBox(width: 7),
+        Text(
+          label,
+          style: TextStyle(
+            color: active ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
     );
   }
 
@@ -85,9 +151,8 @@ class _ReservationScreenState extends State<ReservationScreen> {
         firstDate: firstDay,
         lastDate: lastDay,
         onDateChanged: (date) => setState(() => _selectedDate = date),
-        selectableDayPredicate: (day) => !day.isBefore(
-          DateTime(now.year, now.month, now.day),
-        ),
+        selectableDayPredicate: (day) =>
+            !day.isBefore(DateTime(now.year, now.month, now.day)),
       ),
     );
   }
@@ -260,9 +325,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
           color: selected ? const Color(0xFF2563EB) : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected
-                ? const Color(0xFF2563EB)
-                : const Color(0xFFE2E8F0),
+            color: selected ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0),
           ),
         ),
         child: Text(
@@ -365,15 +428,11 @@ class _ReservationScreenState extends State<ReservationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final itemName =
-        (widget.item['name'] as String?) ?? 'Pro Cordless Drill';
+    final itemName = widget.item.name;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
           onPressed: () => Navigator.of(context).pop(),
@@ -382,7 +441,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Book Equipment',
+              'Choose your schedule',
               style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
@@ -405,50 +464,45 @@ class _ReservationScreenState extends State<ReservationScreen> {
       body: Stack(
         children: [
           SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 124),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                _buildStepHeader(),
+                const SizedBox(height: 22),
                 // ── Item summary strip ──
                 Container(
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
                   ),
                   child: Row(
                     children: [
                       Container(
-                        width: 52,
-                        height: 52,
+                        width: 56,
+                        height: 56,
                         decoration: BoxDecoration(
-                          color: (widget.item['color'] as Color?) ??
-                              const Color(0xFFFFF7ED),
+                          color: _itemColor,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: widget.item['image'] != null
+                        child: widget.item.imageUrl.isNotEmpty
                             ? ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
-                                child: widget.item['image'].startsWith('assets/')
+                                child: widget.item.imageUrl.startsWith('assets/')
                                     ? Image.asset(
-                                        widget.item['image'],
+                                        widget.item.imageUrl,
                                         fit: BoxFit.cover,
                                       )
                                     : Image.network(
-                                        widget.item['image'],
+                                        widget.item.imageUrl,
                                         fit: BoxFit.cover,
                                         errorBuilder: (context, error, stackTrace) =>
                                             const Icon(Icons.error, color: Colors.grey),
                                       ),
                               )
-                            : Icon(
-                                (widget.item['icon'] as IconData?) ??
-                                    Icons.construction,
-                                color: (widget.item['iconColor'] as Color?) ??
-                                    const Color(0xFFF59E0B),
-                                size: 26,
-                              ),
+                            : Icon(_itemIcon, color: _itemIconColor, size: 26),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -464,6 +518,15 @@ class _ReservationScreenState extends State<ReservationScreen> {
                               ),
                             ),
                             const SizedBox(height: 2),
+                            const Text(
+                              'Ready to reserve',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF64748B),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
                             Text(
                               '\$${_pricePerHour.toStringAsFixed(0)} / hour',
                               style: const TextStyle(
@@ -484,7 +547,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                           ),
                           const SizedBox(width: 3),
                           Text(
-                            '${(widget.item['rating'] as double?) ?? 4.8}',
+                            '4.8',
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
@@ -538,9 +601,12 @@ class _ReservationScreenState extends State<ReservationScreen> {
 
                 // ── Duration Quick chips ──
                 Row(
-                  children: [2, 4, 6, 8]
-                      .map((h) => _buildQuickDurationChip(h))
-                      .toList(),
+                  children: [
+                    2,
+                    4,
+                    6,
+                    8,
+                  ].map((h) => _buildQuickDurationChip(h)).toList(),
                 ),
 
                 const SizedBox(height: 16),
