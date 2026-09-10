@@ -61,8 +61,8 @@ class RentalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = _getStatusColor(rental.status);
-    final statusBgColor = _getStatusBackgroundColor(rental.status);
+    final statusColor = _getStatusColor(rental.status.name);
+    final statusBgColor = _getStatusBackgroundColor(rental.status.name);
     final dateRange = _formatDateRange(rental.startDate, rental.endDate);
 
     return InkWell(
@@ -136,7 +136,7 @@ class RentalCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      rental.status.toUpperCase(),
+                      rental.status.name.toUpperCase(),
                       style: TextStyle(
                         color: statusColor,
                         fontSize: 9,

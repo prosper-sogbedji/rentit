@@ -1,4 +1,4 @@
-le enum ItemStatus { available, unavailable, maintenance }
+enum ItemStatus { available, unavailable, maintenance }
 
 class ItemModel {
   final String id;

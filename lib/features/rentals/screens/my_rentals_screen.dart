@@ -24,7 +24,7 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
       endDate: DateTime(2026, 10, 15),
       duration: 3,
       totalPrice: 45.00,
-      status: 'active',
+      status: RentalStatus.confirmed,
       createdAt: DateTime.now(),
     ),
     RentalModel(
@@ -35,7 +35,7 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
       endDate: DateTime(2026, 10, 22),
       duration: 2,
       totalPrice: 70.00,
-      status: 'pending',
+      status: RentalStatus.pending,
       createdAt: DateTime.now(),
     ),
     RentalModel(
@@ -46,7 +46,7 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
       endDate: DateTime(2026, 9, 4),
       duration: 3,
       totalPrice: 120.00,
-      status: 'completed',
+      status: RentalStatus.completed,
       createdAt: DateTime.now().subtract(const Duration(days: 10)),
     ),
   ];
@@ -65,7 +65,7 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
 
   List<RentalModel> _filterRentals(String status) {
     return _allRentals
-        .where((r) => r.status.toLowerCase() == status.toLowerCase())
+        .where((r) => r.status.name.toLowerCase() == status.toLowerCase())
         .toList();
   }
 
@@ -102,17 +102,17 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
       children: rentals.map((rental) {
         return RentalCard(
           rental: rental,
-          itemName: rental.status == 'active'
+          itemName: rental.status.name == 'confirmed'
               ? 'Professional Cordless Drill'
-              : (rental.status == 'pending'
+              : (rental.status.name == 'pending'
                   ? 'DSLR Camera 4K Master'
                   : 'Heavy Duty Jackhammer'),
-          ownerName: rental.status == 'active'
+          ownerName: rental.status.name == 'confirmed'
               ? 'Sarah J.'
-              : (rental.status == 'pending' ? 'David L.' : 'Marc A.'),
-          itemImageUrl: rental.status == 'active'
+              : (rental.status.name == 'pending' ? 'David L.' : 'Marc A.'),
+          itemImageUrl: rental.status.name == 'confirmed'
               ? 'assets/images/drill.jpg'
-              : (rental.status == 'pending'
+              : (rental.status.name == 'pending'
                   ? 'assets/images/camera.jpg'
                   : 'assets/images/jackhammer.jpg'),
           onTap: () {
@@ -195,7 +195,7 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
               animation: _tabController,
               builder: (context, child) {
                 final currentStatus = _tabController.index == 0
-                    ? 'active'
+                    ? 'confirmed'
                     : (_tabController.index == 1 ? 'pending' : 'completed');
                 return _buildRentalList(currentStatus);
               },

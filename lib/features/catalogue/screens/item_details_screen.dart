@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../reservation/screens/reservation_screen.dart';
+import '../../../models/item_model.dart';
 
 class ItemDetailsScreen extends StatelessWidget {
   final Map<String, dynamic> item;
@@ -567,7 +569,25 @@ class ItemDetailsScreen extends StatelessWidget {
                   const SizedBox(width: 16),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        final price = (item['price'] is num) ? (item['price'] as num).toDouble() : double.tryParse(item['price'].toString()) ?? 15.0;
+                        final mappedItem = ItemModel(
+                          id: item['id']?.toString() ?? 'item_001',
+                          name: item['name'] ?? 'Unknown Item',
+                          description: item['description'] ?? 'No description',
+                          categoryId: item['categoryId']?.toString() ?? 'tools',
+                          imageUrl: item['image'] ?? '',
+                          pricePerDay: price * 24,
+                          quantity: 1,
+                          createdAt: DateTime.now(),
+                        );
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ReservationScreen(item: mappedItem),
+                          ),
+                        );
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF2563EB),
                         foregroundColor: Colors.white,
