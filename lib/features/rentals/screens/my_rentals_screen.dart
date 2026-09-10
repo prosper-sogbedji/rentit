@@ -1,5 +1,8 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../models/rental_model.dart';
+import '../providers/rental_provider.dart';
 import '../widgets/rental_card.dart';
 import '../widgets/rental_insight_metric.dart';
 
@@ -14,43 +17,6 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  // Mock data matching the design before Firebase integration
-  final List<RentalModel> _allRentals = [
-    RentalModel(
-      id: 'rent_1',
-      userId: 'user_1',
-      itemId: 'item_1',
-      startDate: DateTime(2026, 10, 12),
-      endDate: DateTime(2026, 10, 15),
-      duration: 3,
-      totalPrice: 45.00,
-      status: RentalStatus.confirmed,
-      createdAt: DateTime.now(),
-    ),
-    RentalModel(
-      id: 'rent_2',
-      userId: 'user_1',
-      itemId: 'item_2',
-      startDate: DateTime(2026, 10, 20),
-      endDate: DateTime(2026, 10, 22),
-      duration: 2,
-      totalPrice: 70.00,
-      status: RentalStatus.pending,
-      createdAt: DateTime.now(),
-    ),
-    RentalModel(
-      id: 'rent_3',
-      userId: 'user_1',
-      itemId: 'item_3',
-      startDate: DateTime(2026, 9, 1),
-      endDate: DateTime(2026, 9, 4),
-      duration: 3,
-      totalPrice: 120.00,
-      status: RentalStatus.completed,
-      createdAt: DateTime.now().subtract(const Duration(days: 10)),
-    ),
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -63,16 +29,22 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
     super.dispose();
   }
 
-  List<RentalModel> _filterRentals(String status) {
-    return _allRentals
-        .where((r) => r.status.name.toLowerCase() == status.toLowerCase())
-        .toList();
-  }
+  Widget _buildRentalList(RentalProvider provider, String statusName) {
+    if (provider.isLoading && provider.rentals.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 40),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
 
-  Widget _buildRentalList(String status) {
-    final rentals = _filterRentals(status);
+    final rentals = provider.rentals
+        .where((r) => r.status.name.toLowerCase() == statusName.toLowerCase())
+        .toList();
 
     if (rentals.isEmpty) {
+      final displayStatus = statusName == 'confirmed' ? 'active' : statusName;
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 40),
@@ -85,7 +57,7 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
               ),
               const SizedBox(height: 12),
               Text(
-                'No $status rentals found',
+                'No $displayStatus rentals found',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -100,25 +72,25 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
 
     return Column(
       children: rentals.map((rental) {
+        final item = provider.getItemForRental(rental.itemId);
+        final itemName = item?.name ?? 'Rental #${rental.id.substring(0, math.min(8, rental.id.length))}';
+        final itemImageUrl = (item?.imageUrl != null && item!.imageUrl.isNotEmpty)
+            ? item.imageUrl
+            : (rental.status == RentalStatus.confirmed
+                ? 'assets/images/drill.jpg'
+                : (rental.status == RentalStatus.pending
+                    ? 'assets/images/camera.jpg'
+                    : 'assets/images/jackhammer.jpg'));
+
         return RentalCard(
           rental: rental,
-          itemName: rental.status.name == 'confirmed'
-              ? 'Professional Cordless Drill'
-              : (rental.status.name == 'pending'
-                  ? 'DSLR Camera 4K Master'
-                  : 'Heavy Duty Jackhammer'),
-          ownerName: rental.status.name == 'confirmed'
-              ? 'Sarah J.'
-              : (rental.status.name == 'pending' ? 'David L.' : 'Marc A.'),
-          itemImageUrl: rental.status.name == 'confirmed'
-              ? 'assets/images/drill.jpg'
-              : (rental.status.name == 'pending'
-                  ? 'assets/images/camera.jpg'
-                  : 'assets/images/jackhammer.jpg'),
+          itemName: itemName,
+          ownerName: 'Verified Partner',
+          itemImageUrl: itemImageUrl,
           onTap: () {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Details for rental #${rental.id}'),
+                content: Text('$itemName (${rental.status.name.toUpperCase()})'),
                 duration: const Duration(seconds: 1),
               ),
             );
@@ -130,6 +102,13 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<RentalProvider>();
+    final totalSpent = provider.rentals.fold<double>(
+      0.0,
+      (sum, r) => sum + r.totalPrice,
+    );
+    final itemsRentedCount = provider.rentals.length;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -197,7 +176,7 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
                 final currentStatus = _tabController.index == 0
                     ? 'confirmed'
                     : (_tabController.index == 1 ? 'pending' : 'completed');
-                return _buildRentalList(currentStatus);
+                return _buildRentalList(provider, currentStatus);
               },
             ),
 
@@ -215,16 +194,16 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
             ),
             const SizedBox(height: 12),
 
-            const Row(
+            Row(
               children: [
                 RentalInsightMetric(
                   label: 'Total Spent',
-                  value: '\$315.00',
+                  value: '\$${totalSpent.toStringAsFixed(2)}',
                 ),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 RentalInsightMetric(
                   label: 'Items Rented',
-                  value: '12',
+                  value: '$itemsRentedCount',
                 ),
               ],
             ),

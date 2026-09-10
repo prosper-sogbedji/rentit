@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import '../../../main.dart';
 import '../../../models/item_model.dart';
 import '../../../models/rental_model.dart';
+import '../../rentals/providers/rental_provider.dart';
 
 class BookingConfirmationScreen extends StatelessWidget {
   final ItemModel item;
@@ -532,7 +535,12 @@ class BookingConfirmationScreen extends StatelessWidget {
                 ],
               ),
               child: ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
+                  // Enregistrer la réservation dans le RentalProvider (gestion d'état réactive)
+                  await context.read<RentalProvider>().bookRental(rental, item: item);
+
+                  if (!context.mounted) return;
+
                   // Show success dialog
                   showDialog(
                     context: context,
@@ -659,9 +667,13 @@ class _SuccessDialog extends StatelessWidget {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  // Pop dialog, then pop all reservation screens
-                  Navigator.of(context).pop();
-                  Navigator.of(context).popUntil((r) => r.isFirst);
+                  // Naviguer directement vers le shell principal sur l'onglet Mes Locations (index 2)
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                      builder: (_) => const MainShell(initialIndex: 2),
+                    ),
+                    (route) => false,
+                  );
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF2563EB),
