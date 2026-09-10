@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/profile_screen.dart';
+import 'features/auth/screens/splash_screen.dart';
 import 'features/catalogue/screens/explore_screen.dart';
 import 'features/rentals/providers/rental_provider.dart';
 import 'features/rentals/screens/my_rentals_screen.dart';
@@ -48,7 +48,7 @@ class RentItApp extends StatelessWidget {
             ),
           ),
         ),
-        home: const LoginScreen(),
+        home: const SplashScreen(),
       ),
     );
   }

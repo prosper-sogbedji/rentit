@@ -53,16 +53,34 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     children: [
                       Container(
-                        width: 64,
-                        height: 64,
+                        width: 72,
+                        height: 72,
+                        padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF2563EB),
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        child: const Icon(
-                          Icons.handshake_outlined,
                           color: Colors.white,
-                          size: 34,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF2563EB).withValues(alpha: 0.15),
+                              blurRadius: 16,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: Image.asset(
+                            'assets/images/logo.png',
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, _, _) => Container(
+                              color: const Color(0xFF2563EB),
+                              child: const Icon(
+                                Icons.handshake_outlined,
+                                color: Colors.white,
+                                size: 34,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 16),
