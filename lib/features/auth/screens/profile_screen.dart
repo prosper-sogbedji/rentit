@@ -1,5 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import '../../../core/providers/language_provider.dart';
+import '../../../core/providers/notification_provider.dart';
+import '../../notifications/screens/notifications_modal.dart';
 import '../../rentals/providers/rental_provider.dart';
 import '../../rentals/screens/my_rentals_screen.dart';
 import 'login_screen.dart';
@@ -21,17 +26,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _name = 'Alex Johnson';
   String _email = 'alex.johnson@rentit.com';
   String _phone = '+1 (555) 234-5678';
-  String _location = 'San Francisco, CA';
-  String _bio = 'Premium tools owner. Always keeping my gear in top shape for every rental.';
+  String _location = 'Paris, France';
   Color _avatarColor = const Color(0xFF2563EB);
   String _avatarInitials = 'AJ';
-
-  // Notification Preferences
-  bool _pushBookingAlerts = true;
-  bool _pushReminders = true;
-  bool _promoOffers = false;
-  bool _emailReceipts = true;
-  bool _smsUpdates = true;
+  File? _customAvatarFile;
 
   // Security Preferences
   bool _biometricEnabled = true;
@@ -54,14 +52,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       'exp': '08/25',
       'isDefault': false,
       'color': const Color(0xFF7C2D12),
-    },
-    {
-      'id': '3',
-      'brand': 'Apple Pay',
-      'last4': 'Connected',
-      'exp': 'N/A',
-      'isDefault': false,
-      'color': const Color(0xFF1F2937),
     },
   ];
 
@@ -92,8 +82,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // ──── 1. AVATAR PICKER MODAL ────
+  // ──── 1. VRAIE SÉLECTION D'IMAGE (CAMÉRA & GALERIE NATIVES) ────
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: source,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (picked != null) {
+        setState(() {
+          _customAvatarFile = File(picked.path);
+        });
+        if (mounted) {
+          final isFr = context.read<LanguageProvider>().isFrench;
+          _showSnack(isFr ? 'Photo de profil mise à jour avec succès !' : 'Profile photo updated successfully!');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        _showSnack('Erreur lors de la sélection : $e', isError: true);
+      }
+    }
+  }
+
   void _showAvatarPicker() {
+    final lang = context.read<LanguageProvider>();
+    final isFr = lang.isFrench;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -102,11 +121,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       builder: (ctx) {
         final avatarPresets = [
-          {'initials': 'AJ', 'color': const Color(0xFF2563EB), 'label': 'Blue'},
-          {'initials': 'AJ', 'color': const Color(0xFF10B981), 'label': 'Emerald'},
-          {'initials': 'AJ', 'color': const Color(0xFF7C3AED), 'label': 'Purple'},
-          {'initials': 'AJ', 'color': const Color(0xFFF59E0B), 'label': 'Amber'},
-          {'initials': 'AJ', 'color': const Color(0xFF0F172A), 'label': 'Dark'},
+          {'initials': _avatarInitials, 'color': const Color(0xFF2563EB)},
+          {'initials': _avatarInitials, 'color': const Color(0xFF10B981)},
+          {'initials': _avatarInitials, 'color': const Color(0xFF7C3AED)},
+          {'initials': _avatarInitials, 'color': const Color(0xFFF59E0B)},
+          {'initials': _avatarInitials, 'color': const Color(0xFF0F172A)},
         ];
 
         return SafeArea(
@@ -124,18 +143,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  'Change Profile Photo',
-                  style: TextStyle(
+                Text(
+                  lang.t('change_photo'),
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
                     color: Color(0xFF0F172A),
                   ),
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Select an avatar theme or upload a custom picture',
-                  style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                const SizedBox(height: 6),
+                Text(
+                  isFr ? 'Prenez une photo ou choisissez dans votre galerie' : 'Take a photo or pick from device gallery',
+                  style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
                 ),
                 const SizedBox(height: 20),
 
@@ -144,14 +163,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: avatarPresets.map((preset) {
                     final color = preset['color'] as Color;
-                    final isSelected = _avatarColor == color;
+                    final isSelected = _avatarColor == color && _customAvatarFile == null;
                     return GestureDetector(
                       onTap: () {
                         setState(() {
                           _avatarColor = color;
+                          _customAvatarFile = null;
                         });
                         Navigator.pop(ctx);
-                        _showSnack('Avatar theme updated!');
+                        _showSnack(isFr ? 'Couleur d\'avatar mise à jour !' : 'Avatar color updated!');
                       },
                       child: Container(
                         padding: const EdgeInsets.all(3),
@@ -163,14 +183,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                         child: CircleAvatar(
-                          radius: 22,
+                          radius: 20,
                           backgroundColor: color,
                           child: Text(
                             preset['initials'] as String,
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w700,
-                              fontSize: 14,
+                              fontSize: 13,
                             ),
                           ),
                         ),
@@ -179,11 +199,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   }).toList(),
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 const Divider(height: 1),
                 const SizedBox(height: 12),
 
-                // Action options
+                // Vraie caméra native
                 ListTile(
                   leading: Container(
                     padding: const EdgeInsets.all(8),
@@ -193,16 +213,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     child: const Icon(Icons.camera_alt_outlined, color: Color(0xFF2563EB)),
                   ),
-                  title: const Text(
-                    'Take a Photo',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                  title: Text(
+                    lang.t('take_photo'),
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                   ),
-                  subtitle: const Text('Use camera to capture new photo', style: TextStyle(fontSize: 12)),
+                  subtitle: Text(
+                    isFr ? 'Ouvrir l\'appareil photo' : 'Open phone camera',
+                    style: const TextStyle(fontSize: 12),
+                  ),
                   onTap: () {
                     Navigator.pop(ctx);
-                    _showSnack('Camera simulated: Photo captured & updated!');
+                    _pickImage(ImageSource.camera);
                   },
                 ),
+
+                // Vraie galerie native
                 ListTile(
                   leading: Container(
                     padding: const EdgeInsets.all(8),
@@ -212,16 +237,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     child: const Icon(Icons.photo_library_outlined, color: Color(0xFF475569)),
                   ),
-                  title: const Text(
-                    'Choose from Gallery',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                  title: Text(
+                    lang.t('choose_gallery'),
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                   ),
-                  subtitle: const Text('Pick from device photos', style: TextStyle(fontSize: 12)),
+                  subtitle: Text(
+                    isFr ? 'Sélectionner une photo du téléphone' : 'Pick from phone library',
+                    style: const TextStyle(fontSize: 12),
+                  ),
                   onTap: () {
                     Navigator.pop(ctx);
-                    _showSnack('Gallery simulated: New picture applied!');
+                    _pickImage(ImageSource.gallery);
                   },
                 ),
+
+                if (_customAvatarFile != null)
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEE2E2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
+                    ),
+                    title: Text(
+                      isFr ? 'Supprimer la photo' : 'Remove photo',
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFFEF4444)),
+                    ),
+                    onTap: () {
+                      setState(() {
+                        _customAvatarFile = null;
+                      });
+                      Navigator.pop(ctx);
+                      _showSnack(isFr ? 'Photo supprimée' : 'Photo removed');
+                    },
+                  ),
               ],
             ),
           ),
@@ -230,13 +281,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // ──── 2. PERSONAL INFORMATION MODAL ────
+  // ──── 2. INFORMATIONS PERSONNELLES (ÉDITION PROPRE ET NATURELLE) ────
   void _showPersonalInfoModal() {
+    final lang = context.read<LanguageProvider>();
+    final isFr = lang.isFrench;
     final nameCtrl = TextEditingController(text: _name);
     final emailCtrl = TextEditingController(text: _email);
     final phoneCtrl = TextEditingController(text: _phone);
     final locationCtrl = TextEditingController(text: _location);
-    final bioCtrl = TextEditingController(text: _bio);
 
     showModalBottomSheet(
       context: context,
@@ -280,20 +332,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: const Icon(Icons.person_outline, color: Color(0xFF7C3AED)),
                     ),
                     const SizedBox(width: 12),
-                    const Column(
+                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Personal Information',
-                          style: TextStyle(
+                          lang.t('menu_personal_info'),
+                          style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
                             color: Color(0xFF0F172A),
                           ),
                         ),
                         Text(
-                          'Update your profile details',
-                          style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                          isFr ? 'Mettre à jour vos coordonnées' : 'Update your contact details',
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                         ),
                       ],
                     ),
@@ -301,63 +353,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Name field
-                _buildFormField(label: 'Full Name', controller: nameCtrl, icon: Icons.badge_outlined),
+                _buildFormField(label: isFr ? 'Nom complet' : 'Full Name', controller: nameCtrl, icon: Icons.badge_outlined),
                 const SizedBox(height: 12),
-
-                // Email field
                 _buildFormField(
-                  label: 'Email Address',
+                  label: isFr ? 'Adresse e-mail' : 'Email Address',
                   controller: emailCtrl,
                   icon: Icons.email_outlined,
                   keyboardType: TextInputType.emailAddress,
                 ),
                 const SizedBox(height: 12),
-
-                // Phone field
                 _buildFormField(
-                  label: 'Phone Number',
+                  label: isFr ? 'Numéro de téléphone' : 'Phone Number',
                   controller: phoneCtrl,
                   icon: Icons.phone_outlined,
                   keyboardType: TextInputType.phone,
                 ),
                 const SizedBox(height: 12),
-
-                // Location field
                 _buildFormField(
-                  label: 'Location',
+                  label: isFr ? 'Ville de résidence' : 'City / Location',
                   controller: locationCtrl,
                   icon: Icons.location_on_outlined,
                 ),
-                const SizedBox(height: 12),
-
-                // Bio field
-                _buildFormField(
-                  label: 'Bio / Description',
-                  controller: bioCtrl,
-                  icon: Icons.description_outlined,
-                  maxLines: 3,
-                ),
                 const SizedBox(height: 24),
 
-                // Save button
                 SizedBox(
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton(
                     onPressed: () {
-                      if (nameCtrl.text.trim().isEmpty) {
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                          const SnackBar(content: Text('Name cannot be empty')),
-                        );
-                        return;
-                      }
+                      if (nameCtrl.text.trim().isEmpty) return;
                       setState(() {
                         _name = nameCtrl.text.trim();
                         _email = emailCtrl.text.trim();
                         _phone = phoneCtrl.text.trim();
                         _location = locationCtrl.text.trim();
-                        _bio = bioCtrl.text.trim();
                         final parts = _name.split(' ');
                         if (parts.length >= 2) {
                           _avatarInitials = '${parts[0][0]}${parts[1][0]}'.toUpperCase();
@@ -366,19 +395,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         }
                       });
                       Navigator.pop(ctx);
-                      _showSnack('Personal information updated successfully!');
+                      _showSnack(isFr ? 'Informations mises à jour !' : 'Information updated!');
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF2563EB),
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
-                    child: const Text(
-                      'Save Changes',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                    child: Text(
+                      lang.t('save_changes'),
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                     ),
                   ),
                 ),
@@ -395,7 +422,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required TextEditingController controller,
     required IconData icon,
     TextInputType? keyboardType,
-    int maxLines = 1,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -412,7 +438,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         TextField(
           controller: controller,
           keyboardType: keyboardType,
-          maxLines: maxLines,
           style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A), fontWeight: FontWeight.w500),
           decoration: InputDecoration(
             prefixIcon: Icon(icon, size: 18, color: const Color(0xFF94A3B8)),
@@ -437,8 +462,80 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // ──── 3. PAYMENT METHODS MODAL ────
+  // ──── 3. SÉLECTEUR DE LANGUE RAPIDE ────
+  void _showLanguageSelector() {
+    final lang = context.read<LanguageProvider>();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Choisir la langue / Select Language',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                ),
+                const SizedBox(height: 20),
+                ListTile(
+                  leading: const Text('🇫🇷', style: TextStyle(fontSize: 28)),
+                  title: const Text('Français', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                  subtitle: const Text('Langue de l\'application en français'),
+                  trailing: lang.isFrench ? const Icon(Icons.check_circle, color: Color(0xFF2563EB)) : null,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: lang.isFrench ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0)),
+                  ),
+                  onTap: () {
+                    lang.setLanguage(AppLanguage.fr);
+                    Navigator.pop(ctx);
+                    _showSnack('Langue changée en Français 🇫🇷');
+                  },
+                ),
+                const SizedBox(height: 10),
+                ListTile(
+                  leading: const Text('🇬🇧', style: TextStyle(fontSize: 28)),
+                  title: const Text('English', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                  subtitle: const Text('App language in English'),
+                  trailing: !lang.isFrench ? const Icon(Icons.check_circle, color: Color(0xFF2563EB)) : null,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: !lang.isFrench ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0)),
+                  ),
+                  onTap: () {
+                    lang.setLanguage(AppLanguage.en);
+                    Navigator.pop(ctx);
+                    _showSnack('Language switched to English 🇬🇧');
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ──── 4. MOYENS DE PAIEMENT ────
   void _showPaymentMethodsModal() {
+    final lang = context.read<LanguageProvider>();
+    final isFr = lang.isFrench;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -467,36 +564,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Payment Methods',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF0F172A),
-                              ),
-                            ),
-                            Text(
-                              'Manage your billing cards & wallets',
-                              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                            ),
-                          ],
-                        ),
-                        IconButton(
-                          onPressed: () => _showAddCardDialog(modalContext, setModalState),
-                          icon: const Icon(Icons.add_circle, color: Color(0xFF2563EB), size: 28),
-                          tooltip: 'Add new card',
-                        ),
-                      ],
+                    Text(
+                      lang.t('menu_payment_methods'),
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                    ),
+                    Text(
+                      isFr ? 'Gérez vos cartes enregistrées' : 'Manage your saved cards',
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                     ),
                     const SizedBox(height: 16),
 
-                    // List of cards
                     ..._paymentMethods.map((pm) {
                       final isDefault = pm['isDefault'] as bool;
                       return Container(
@@ -505,13 +582,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         decoration: BoxDecoration(
                           color: pm['color'] as Color,
                           borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
                         ),
                         child: Row(
                           children: [
@@ -523,21 +593,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 children: [
                                   Text(
                                     pm['brand'] as String,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 15,
-                                    ),
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    pm['last4'] == 'Connected'
-                                        ? 'Apple Pay Wallet'
-                                        : '•••• •••• •••• ${pm['last4']}  (${pm['exp']})',
-                                    style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.8),
-                                      fontSize: 12,
-                                    ),
+                                    '•••• •••• •••• ${pm['last4']}  (${pm['exp']})',
+                                    style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12),
                                   ),
                                 ],
                               ),
@@ -549,55 +610,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   color: Colors.white.withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
-                                child: const Text(
-                                  'DEFAULT',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 10,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              )
-                            else
-                              TextButton(
-                                onPressed: () {
-                                  setModalState(() {
-                                    for (var item in _paymentMethods) {
-                                      item['isDefault'] = false;
-                                    }
-                                    pm['isDefault'] = true;
-                                  });
-                                  setState(() {});
-                                  _showSnack('${pm['brand']} is now your default payment method.');
-                                },
-                                child: const Text(
-                                  'Set Default',
-                                  style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                                child: Text(
+                                  isFr ? 'PAR DÉFAUT' : 'DEFAULT',
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 10),
                                 ),
                               ),
                           ],
                         ),
                       );
                     }),
-
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: OutlinedButton.icon(
-                        onPressed: () => _showAddCardDialog(modalContext, setModalState),
-                        icon: const Icon(Icons.add, color: Color(0xFF2563EB)),
-                        label: const Text(
-                          'Add New Card',
-                          style: TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.w700),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFFBFDBFE)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -608,239 +629,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _showAddCardDialog(BuildContext parentCtx, StateSetter modalSetState) {
-    final numberCtrl = TextEditingController();
-    final expCtrl = TextEditingController();
-    final cvvCtrl = TextEditingController();
-
-    showDialog(
-      context: parentCtx,
-      builder: (dialogCtx) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Add Payment Card', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: numberCtrl,
-                keyboardType: TextInputType.number,
-                maxLength: 16,
-                decoration: InputDecoration(
-                  labelText: 'Card Number',
-                  counterText: '',
-                  prefixIcon: const Icon(Icons.credit_card),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: expCtrl,
-                      keyboardType: TextInputType.datetime,
-                      maxLength: 5,
-                      decoration: InputDecoration(
-                        labelText: 'MM/YY',
-                        counterText: '',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: cvvCtrl,
-                      keyboardType: TextInputType.number,
-                      maxLength: 3,
-                      obscureText: true,
-                      decoration: InputDecoration(
-                        labelText: 'CVV',
-                        counterText: '',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogCtx),
-              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final num = numberCtrl.text.trim();
-                if (num.length < 4) {
-                  ScaffoldMessenger.of(parentCtx).showSnackBar(
-                    const SnackBar(content: Text('Please enter a valid card number')),
-                  );
-                  return;
-                }
-                final last4 = num.substring(num.length - 4);
-                modalSetState(() {
-                  _paymentMethods.add({
-                    'id': DateTime.now().millisecondsSinceEpoch.toString(),
-                    'brand': num.startsWith('4') ? 'Visa' : 'Mastercard',
-                    'last4': last4,
-                    'exp': expCtrl.text.isNotEmpty ? expCtrl.text : '12/28',
-                    'isDefault': false,
-                    'color': const Color(0xFF0369A1),
-                  });
-                });
-                setState(() {});
-                Navigator.pop(dialogCtx);
-                _showSnack('Card ending in $last4 added successfully!');
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2563EB),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              child: const Text('Add Card'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // ──── 4. NOTIFICATIONS MODAL ────
-  void _showNotificationsModal() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (modalCtx, setModalState) {
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFCBD5E1),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEFF6FF),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.notifications_outlined, color: Color(0xFF2563EB)),
-                        ),
-                        const SizedBox(width: 12),
-                        const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Notification Settings',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF0F172A),
-                              ),
-                            ),
-                            Text(
-                              'Choose how and when to receive alerts',
-                              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-
-                    SwitchListTile(
-                      activeThumbColor: const Color(0xFF2563EB),
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Booking Alerts & Updates', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                      subtitle: const Text('Instant notification when booking is approved or ready', style: TextStyle(fontSize: 12)),
-                      value: _pushBookingAlerts,
-                      onChanged: (val) {
-                        setModalState(() => _pushBookingAlerts = val);
-                        setState(() => _pushBookingAlerts = val);
-                      },
-                    ),
-                    const Divider(height: 1),
-                    SwitchListTile(
-                      activeThumbColor: const Color(0xFF2563EB),
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Rental Return Reminders', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                      subtitle: const Text('Reminders 24h & 2h before rental period ends', style: TextStyle(fontSize: 12)),
-                      value: _pushReminders,
-                      onChanged: (val) {
-                        setModalState(() => _pushReminders = val);
-                        setState(() => _pushReminders = val);
-                      },
-                    ),
-                    const Divider(height: 1),
-                    SwitchListTile(
-                      activeThumbColor: const Color(0xFF2563EB),
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Email Receipts & Invoices', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                      subtitle: const Text('Send PDF receipts directly to your email', style: TextStyle(fontSize: 12)),
-                      value: _emailReceipts,
-                      onChanged: (val) {
-                        setModalState(() => _emailReceipts = val);
-                        setState(() => _emailReceipts = val);
-                      },
-                    ),
-                    const Divider(height: 1),
-                    SwitchListTile(
-                      activeThumbColor: const Color(0xFF2563EB),
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('SMS Urgent Alerts', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                      subtitle: const Text('Receive immediate SMS when owner accepts pickup', style: TextStyle(fontSize: 12)),
-                      value: _smsUpdates,
-                      onChanged: (val) {
-                        setModalState(() => _smsUpdates = val);
-                        setState(() => _smsUpdates = val);
-                      },
-                    ),
-                    const Divider(height: 1),
-                    SwitchListTile(
-                      activeThumbColor: const Color(0xFF2563EB),
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Promotions & Discounts', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                      subtitle: const Text('Special rental offers and weekend discounts', style: TextStyle(fontSize: 12)),
-                      value: _promoOffers,
-                      onChanged: (val) {
-                        setModalState(() => _promoOffers = val);
-                        setState(() => _promoOffers = val);
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  // ──── 5. SECURITY MODAL ────
+  // ──── 5. SÉCURITÉ ────
   void _showSecurityModal() {
+    final lang = context.read<LanguageProvider>();
+    final isFr = lang.isFrench;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -868,76 +661,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFECFDF5),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.security_outlined, color: Color(0xFF059669)),
-                        ),
-                        const SizedBox(width: 12),
-                        const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Security & Privacy',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF0F172A),
-                              ),
-                            ),
-                            Text(
-                              'Protect your RentIt account',
-                              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                            ),
-                          ],
-                        ),
-                      ],
+                    Text(
+                      lang.t('menu_security'),
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                    ),
+                    Text(
+                      isFr ? 'Protégez votre compte RentIt' : 'Protect your RentIt account',
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                     ),
                     const SizedBox(height: 20),
 
                     SwitchListTile(
                       activeThumbColor: const Color(0xFF059669),
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('Biometric Authentication', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                      subtitle: const Text('Unlock with Fingerprint or Face ID', style: TextStyle(fontSize: 12)),
+                      title: Text(isFr ? 'Authentification biométrique' : 'Biometric Login', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                      subtitle: Text(isFr ? 'Déverrouillage par empreinte ou Face ID' : 'Fingerprint or Face ID', style: const TextStyle(fontSize: 12)),
                       value: _biometricEnabled,
                       onChanged: (val) {
                         setModalState(() => _biometricEnabled = val);
                         setState(() => _biometricEnabled = val);
-                        _showSnack(val ? 'Biometrics activated' : 'Biometrics deactivated');
                       },
                     ),
                     const Divider(height: 1),
                     SwitchListTile(
                       activeThumbColor: const Color(0xFF059669),
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('Two-Factor Authentication (2FA)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                      subtitle: const Text('Require SMS code on unknown devices', style: TextStyle(fontSize: 12)),
+                      title: Text(isFr ? 'Validation en deux étapes (2FA)' : 'Two-Factor Auth (2FA)', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                      subtitle: Text(isFr ? 'Code de confirmation par SMS' : 'SMS confirmation code', style: const TextStyle(fontSize: 12)),
                       value: _twoFactorEnabled,
                       onChanged: (val) {
                         setModalState(() => _twoFactorEnabled = val);
                         setState(() => _twoFactorEnabled = val);
-                        _showSnack(val ? '2FA enabled on your account' : '2FA disabled');
                       },
                     ),
-                    const Divider(height: 1),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.lock_reset, color: Color(0xFF475569)),
-                      title: const Text('Change Password', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                      subtitle: const Text('Last changed 3 months ago', style: TextStyle(fontSize: 12)),
-                      trailing: const Icon(Icons.chevron_right, color: Color(0xFF94A3B8)),
-                      onTap: () {
-                        Navigator.pop(ctx);
-                        _showChangePasswordDialog();
-                      },
-                    ),
-                    const SizedBox(height: 10),
                   ],
                 ),
               ),
@@ -948,71 +704,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _showChangePasswordDialog() {
-    final oldPassCtrl = TextEditingController();
-    final newPassCtrl = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Change Password', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: oldPassCtrl,
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: 'Current Password',
-                  prefixIcon: const Icon(Icons.lock_outline),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: newPassCtrl,
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: 'New Password',
-                  prefixIcon: const Icon(Icons.lock_reset),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (newPassCtrl.text.trim().length < 6) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('Password must be at least 6 characters')),
-                  );
-                  return;
-                }
-                Navigator.pop(ctx);
-                _showSnack('Password successfully updated!');
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF059669),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              child: const Text('Update'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // ──── 6. HELP & SUPPORT MODAL ────
+  // ──── 6. AIDE ET SUPPORT ────
   void _showHelpSupportModal() {
+    final lang = context.read<LanguageProvider>();
+    final isFr = lang.isFrench;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1022,9 +718,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       builder: (ctx) {
         return DraggableScrollableSheet(
-          initialChildSize: 0.75,
-          maxChildSize: 0.9,
-          minChildSize: 0.5,
+          initialChildSize: 0.65,
+          maxChildSize: 0.85,
+          minChildSize: 0.4,
           expand: false,
           builder: (_, scrollController) {
             return SingleChildScrollView(
@@ -1044,131 +740,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFFBEB),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.help_outline, color: Color(0xFFF59E0B)),
-                      ),
-                      const SizedBox(width: 12),
-                      const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Help & Customer Support',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF0F172A),
-                            ),
-                          ),
-                          Text(
-                            '24/7 dedicated assistance for rentals',
-                            style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                          ),
-                        ],
-                      ),
-                    ],
+                  Text(
+                    lang.t('menu_help'),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                  ),
+                  Text(
+                    isFr ? 'Assistance et foire aux questions' : 'Support and frequently asked questions',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                   ),
                   const SizedBox(height: 20),
 
-                  // Quick Contact Buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            Navigator.pop(ctx);
-                            _showSnack('Starting live chat with RentIt Support...');
-                          },
-                          icon: const Icon(Icons.chat_bubble_outline, size: 18, color: Color(0xFF2563EB)),
-                          label: const Text('Live Chat', style: TextStyle(color: Color(0xFF2563EB), fontSize: 13, fontWeight: FontWeight.w600)),
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Color(0xFFBFDBFE)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            Navigator.pop(ctx);
-                            _showSnack('Call Hotline: +1 (800) 736-8481');
-                          },
-                          icon: const Icon(Icons.headset_mic_outlined, size: 18, color: Color(0xFF059669)),
-                          label: const Text('Hotline', style: TextStyle(color: Color(0xFF059669), fontSize: 13, fontWeight: FontWeight.w600)),
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Color(0xFFA7F3D0)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 24),
-                  const Text(
-                    'FREQUENTLY ASKED QUESTIONS',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF64748B), letterSpacing: 0.8),
-                  ),
-                  const SizedBox(height: 10),
-
-                  const ExpansionTile(
-                    title: Text('How does the rental security deposit work?', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                  ExpansionTile(
+                    title: Text(
+                      isFr ? 'Comment fonctionne la caution de location ?' : 'How does the security deposit work?',
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
                     children: [
                       Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         child: Text(
-                          'The security deposit is temporarily authorized on your card when booking. It is fully released within 24 hours after the item is returned in good condition.',
-                          style: TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.4),
+                          isFr
+                              ? 'La caution est une autorisation temporaire sur votre carte bancaire. Elle est libérée dans les 24h suivant le retour du matériel en bon état.'
+                              : 'The deposit is a temporary hold on your card. It is released within 24h after returning the equipment in good condition.',
+                          style: const TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.4),
                         ),
                       ),
                     ],
                   ),
-                  const ExpansionTile(
-                    title: Text('What if an item is returned late?', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                  ExpansionTile(
+                    title: Text(
+                      isFr ? 'Que faire en cas de retard de restitution ?' : 'What if equipment is returned late?',
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
                     children: [
                       Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         child: Text(
-                          'You can request a rental extension directly from the My Rentals tab before your period ends. Late returns without prior notice may incur an hourly overtime rate.',
-                          style: TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.4),
+                          isFr
+                              ? 'Vous pouvez demander une prolongation directement dans l\'onglet "Mes Locations" avant l\'échéance de votre contrat.'
+                              : 'You can request an extension directly from the My Rentals tab before the rental expires.',
+                          style: const TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.4),
                         ),
                       ),
                     ],
                   ),
-                  const ExpansionTile(
-                    title: Text('Are rented tools and gear insured?', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                    children: [
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        child: Text(
-                          'Yes! All rentals include RentIt Basic Shield coverage against normal wear and unintentional equipment breakdown.',
-                          style: TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.4),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const ExpansionTile(
-                    title: Text('How do I become a VerifiedPro owner?', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                    children: [
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        child: Text(
-                          'Complete at least 10 successful rentals with an average rating above 4.8 and submit your identity verification documents in Personal Information.',
-                          style: TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.4),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
                 ],
               ),
             );
@@ -1178,31 +793,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // ──── 7. LOGOUT CONFIRMATION ────
+  // ──── 7. DÉCONNEXION ────
   void _confirmLogout() {
+    final lang = context.read<LanguageProvider>();
     showDialog(
       context: context,
       builder: (ctx) {
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.logout, color: Color(0xFFEF4444), size: 22),
-              SizedBox(width: 10),
-              Text(
-                'Log Out',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
-              ),
+              const Icon(Icons.logout, color: Color(0xFFEF4444), size: 22),
+              const SizedBox(width: 10),
+              Text(lang.t('logout_confirm_title'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
             ],
           ),
-          content: const Text(
-            'Are you sure you want to sign out of your RentIt account?',
-            style: TextStyle(fontSize: 14, color: Color(0xFF475569)),
-          ),
+          content: Text(lang.t('logout_confirm_msg'), style: const TextStyle(fontSize: 14, color: Color(0xFF475569))),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+              child: Text(lang.t('cancel'), style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
             ),
             ElevatedButton(
               onPressed: () {
@@ -1215,60 +825,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFEF4444),
                 foregroundColor: Colors.white,
-                elevation: 0,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              child: const Text('Log Out', style: TextStyle(fontWeight: FontWeight.w700)),
+              child: Text(lang.t('logout_btn'), style: const TextStyle(fontWeight: FontWeight.w700)),
             ),
           ],
         );
       },
-    );
-  }
-
-  // ──── 8. STAT CARD BUILDER ────
-  Widget _buildStatCard({
-    required String value,
-    required String label,
-    required IconData icon,
-    VoidCallback? onTap,
-  }) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-          decoration: BoxDecoration(
-            color: const Color(0xFFEFF6FF),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Column(
-            children: [
-              Icon(icon, color: const Color(0xFF2563EB), size: 22),
-              const SizedBox(height: 6),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF64748B),
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -1293,6 +856,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required String subtitle,
     Color iconColor = const Color(0xFF2563EB),
     Color iconBg = const Color(0xFFEFF6FF),
+    Widget? trailingWidget,
     VoidCallback? onTap,
   }) {
     return InkWell(
@@ -1348,11 +912,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-            const Icon(
-              Icons.chevron_right,
-              color: Color(0xFFCBD5E1),
-              size: 20,
-            ),
+            trailingWidget ??
+                const Icon(
+                  Icons.chevron_right,
+                  color: Color(0xFFCBD5E1),
+                  size: 20,
+                ),
           ],
         ),
       ),
@@ -1361,11 +926,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Dynamically watch rental count if available
-    int userRentalsCount = 42;
+    final lang = context.watch<LanguageProvider>();
+    final notifProvider = context.watch<NotificationProvider>();
+    final isFr = lang.isFrench;
+
+    int userRentalsCount = 1;
     try {
       final rentalProvider = context.watch<RentalProvider>();
-      userRentalsCount = 42 + rentalProvider.rentals.length;
+      userRentalsCount = rentalProvider.rentals.length;
     } catch (_) {}
 
     return Scaffold(
@@ -1374,23 +942,76 @@ class _ProfileScreenState extends State<ProfileScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
-        title: const Text(
-          'My Profile',
-          style: TextStyle(
+        title: Text(
+          lang.t('profile_title'),
+          style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w700,
             color: Color(0xFF0F172A),
           ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(
-              Icons.notifications_none_outlined,
-              color: Color(0xFF0F172A),
+          // Switch de langue rapide dans l'appbar
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFBFDBFE)),
             ),
-            tooltip: 'Notification settings',
-            onPressed: _showNotificationsModal,
+            child: InkWell(
+              onTap: lang.toggleLanguage,
+              borderRadius: BorderRadius.circular(20),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(isFr ? '🇫🇷' : '🇬🇧', style: const TextStyle(fontSize: 14)),
+                    const SizedBox(width: 4),
+                    Text(
+                      isFr ? 'FR' : 'EN',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF2563EB),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
+          const SizedBox(width: 6),
+
+          // Vraie cloche de notification avec badge
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(
+                  Icons.notifications_none_outlined,
+                  color: Color(0xFF0F172A),
+                ),
+                tooltip: lang.t('notif_title'),
+                onPressed: () => NotificationsModal.show(context),
+              ),
+              if (notifProvider.unreadCount > 0)
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFEF4444),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 8),
         ],
       ),
       body: SingleChildScrollView(
@@ -1400,7 +1021,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: [
             const SizedBox(height: 20),
 
-            // ──── Profile Card ────
+            // ──── Profile Card Épurée (Sans badges IA artificiels) ────
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -1418,22 +1039,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               child: Column(
                 children: [
-                  // Avatar + Camera Badge + VerifiedPro badge
+                  // Avatar interactif (caméra/galerie native)
                   GestureDetector(
                     onTap: _showAvatarPicker,
                     child: Stack(
                       children: [
                         CircleAvatar(
-                          radius: 44,
+                          radius: 46,
                           backgroundColor: _avatarColor,
-                          child: Text(
-                            _avatarInitials,
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                            ),
-                          ),
+                          backgroundImage: _customAvatarFile != null ? FileImage(_customAvatarFile!) : null,
+                          child: _customAvatarFile == null
+                              ? Text(
+                                  _avatarInitials,
+                                  style: const TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : null,
                         ),
                         Positioned(
                           bottom: 0,
@@ -1443,12 +1067,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             decoration: BoxDecoration(
                               color: const Color(0xFF2563EB),
                               shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
+                              border: Border.all(color: Colors.white, width: 2.5),
                             ),
                             child: const Icon(
                               Icons.camera_alt,
                               color: Colors.white,
-                              size: 13,
+                              size: 14,
                             ),
                           ),
                         ),
@@ -1457,7 +1081,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  // Name
+                  // Nom réel
                   Text(
                     _name,
                     style: const TextStyle(
@@ -1468,100 +1092,106 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 4),
 
-                  // VerifiedPro badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFFBFDBFE)),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.verified,
-                          size: 13,
-                          color: Color(0xFF2563EB),
+                  // Email & Ville (sobre et naturel)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.location_on_outlined, size: 14, color: Color(0xFF64748B)),
+                      const SizedBox(width: 4),
+                      Text(
+                        _location,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w500,
                         ),
-                        SizedBox(width: 4),
-                        Text(
-                          'VerifiedPro',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF2563EB),
-                          ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        '•',
+                        style: TextStyle(color: Colors.grey.shade400),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        _email,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w500,
                         ),
-                        SizedBox(width: 8),
-                        Text(
-                          '4.9',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF0F172A),
-                          ),
-                        ),
-                        SizedBox(width: 2),
-                        Icon(Icons.star, size: 12, color: Color(0xFFF59E0B)),
-                        Text(
-                          '(128)',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFF94A3B8),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Description / Bio
-                  Text(
-                    _bio,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF64748B),
-                      height: 1.5,
-                    ),
+                      ),
+                    ],
                   ),
 
                   const SizedBox(height: 18),
 
-                  // Stats Row: RENTALS | $1.2k EARNINGS | 2y MEMBER
+                  // Statistiques réelles et sobres
                   Row(
                     children: [
-                      _buildStatCard(
-                        value: '$userRentalsCount',
-                        label: 'RENTALS',
-                        icon: Icons.calendar_today_outlined,
-                        onTap: () {
-                          if (widget.onNavigateToRentals != null) {
-                            widget.onNavigateToRentals!();
-                          } else {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => const MyRentalsScreen()),
-                            );
-                          }
-                        },
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Column(
+                            children: [
+                              Text(
+                                '$userRentalsCount',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                lang.t('stat_rentals'),
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF64748B),
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      const SizedBox(width: 10),
-                      _buildStatCard(
-                        value: '\$1.2k',
-                        label: 'EARNINGS',
-                        icon: Icons.attach_money,
-                        onTap: () => _showPaymentMethodsModal(),
-                      ),
-                      const SizedBox(width: 10),
-                      _buildStatCard(
-                        value: '2y',
-                        label: 'MEMBER',
-                        icon: Icons.access_time,
-                        onTap: _showPersonalInfoModal,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Column(
+                            children: [
+                              Text(
+                                lang.t('member_years'),
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                lang.t('stat_member_since'),
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF64748B),
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -1571,12 +1201,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             const SizedBox(height: 24),
 
-            // ──── RENTAL MANAGEMENT ────
-            _buildSectionTitle('RENTAL MANAGEMENT'),
+            // ──── GESTION DES LOCATIONS ────
+            _buildSectionTitle(lang.t('section_management')),
             _buildMenuTile(
               icon: Icons.history,
-              title: 'Rental History',
-              subtitle: 'View your past and active rentals',
+              title: lang.t('menu_rental_history'),
+              subtitle: lang.t('menu_rental_history_sub'),
               onTap: () {
                 if (widget.onNavigateToRentals != null) {
                   widget.onNavigateToRentals!();
@@ -1589,41 +1219,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             _buildMenuTile(
               icon: Icons.credit_card_outlined,
-              title: 'Payment Methods',
-              subtitle: 'Cards, Wallet, and Billing info',
+              title: lang.t('menu_payment_methods'),
+              subtitle: lang.t('menu_payment_methods_sub'),
               onTap: _showPaymentMethodsModal,
             ),
             _buildMenuTile(
               icon: Icons.notifications_outlined,
-              title: 'Notifications',
-              subtitle: 'Alerts for bookings and messages',
-              onTap: _showNotificationsModal,
+              title: lang.t('menu_notifications'),
+              subtitle: lang.t('menu_notifications_sub'),
+              trailingWidget: notifProvider.unreadCount > 0
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '${notifProvider.unreadCount}',
+                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
+                      ),
+                    )
+                  : null,
+              onTap: () => NotificationsModal.show(context),
             ),
 
             const SizedBox(height: 8),
 
-            // ──── GENERAL SETTINGS ────
-            _buildSectionTitle('GENERAL SETTINGS'),
+            // ──── PARAMÈTRES GÉNÉRAUX ────
+            _buildSectionTitle(lang.t('section_settings')),
             _buildMenuTile(
               icon: Icons.person_outline,
-              title: 'Personal Information',
-              subtitle: 'Edit your name, email, and bio',
+              title: lang.t('menu_personal_info'),
+              subtitle: lang.t('menu_personal_info_sub'),
               iconColor: const Color(0xFF7C3AED),
               iconBg: const Color(0xFFF5F3FF),
               onTap: _showPersonalInfoModal,
             ),
             _buildMenuTile(
+              icon: Icons.translate,
+              title: lang.t('menu_language'),
+              subtitle: isFr ? 'Français (Appuyer pour changer)' : 'English (Tap to switch)',
+              iconColor: const Color(0xFF2563EB),
+              iconBg: const Color(0xFFEFF6FF),
+              trailingWidget: Text(isFr ? '🇫🇷 FR' : '🇬🇧 EN', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF2563EB))),
+              onTap: _showLanguageSelector,
+            ),
+            _buildMenuTile(
               icon: Icons.security_outlined,
-              title: 'Security',
-              subtitle: 'Password, 2FA, and Privacy',
+              title: lang.t('menu_security'),
+              subtitle: lang.t('menu_security_sub'),
               iconColor: const Color(0xFF059669),
               iconBg: const Color(0xFFECFDF5),
               onTap: _showSecurityModal,
             ),
             _buildMenuTile(
               icon: Icons.help_outline,
-              title: 'Help & Support',
-              subtitle: 'FAQs, Contact us, Terms of Service',
+              title: lang.t('menu_help'),
+              subtitle: lang.t('menu_help_sub'),
               iconColor: const Color(0xFFF59E0B),
               iconBg: const Color(0xFFFFFBEB),
               onTap: _showHelpSupportModal,
@@ -1631,7 +1283,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             const SizedBox(height: 16),
 
-            // ──── Log Out ────
+            // ──── Déconnexion ────
             SizedBox(
               width: double.infinity,
               height: 52,
@@ -1642,9 +1294,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   color: Color(0xFFEF4444),
                   size: 20,
                 ),
-                label: const Text(
-                  'Log Out',
-                  style: TextStyle(
+                label: Text(
+                  lang.t('logout_btn'),
+                  style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: Color(0xFFEF4444),
@@ -1660,16 +1312,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
 
             // Version Footer
             const Center(
               child: Text(
-                'RentIt v1.0.0 (Stable build)',
+                'RentIt v1.0.0',
                 style: TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFFCBD5E1),
-                  fontWeight: FontWeight.w400,
+                  fontSize: 12,
+                  color: Color(0xFF94A3B8),
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),

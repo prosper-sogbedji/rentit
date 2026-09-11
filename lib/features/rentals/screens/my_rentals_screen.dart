@@ -1,6 +1,9 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/providers/language_provider.dart';
+import '../../../core/providers/notification_provider.dart';
+import '../../notifications/screens/notifications_modal.dart';
 import '../../../models/rental_model.dart';
 import '../providers/rental_provider.dart';
 import '../widgets/rental_card.dart';
@@ -29,7 +32,7 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
     super.dispose();
   }
 
-  Widget _buildRentalList(RentalProvider provider, String statusName) {
+  Widget _buildRentalList(RentalProvider provider, String statusName, bool isFr) {
     if (provider.isLoading && provider.rentals.isEmpty) {
       return const Center(
         child: Padding(
@@ -44,7 +47,6 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
         .toList();
 
     if (rentals.isEmpty) {
-      final displayStatus = statusName == 'confirmed' ? 'active' : statusName;
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 40),
@@ -57,11 +59,11 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
               ),
               const SizedBox(height: 12),
               Text(
-                'No $displayStatus rentals found',
-                style: TextStyle(
+                isFr ? 'Aucune location dans cette catégorie' : 'No rentals in this category',
+                style: const TextStyle(
                   fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF64748B),
                 ),
               ),
             ],
@@ -73,7 +75,7 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
     return Column(
       children: rentals.map((rental) {
         final item = provider.getItemForRental(rental.itemId);
-        final itemName = item?.name ?? 'Rental #${rental.id.substring(0, math.min(8, rental.id.length))}';
+        final itemName = item?.name ?? (isFr ? 'Location #${rental.id.substring(0, math.min(8, rental.id.length))}' : 'Rental #${rental.id.substring(0, math.min(8, rental.id.length))}');
         final itemImageUrl = (item?.imageUrl != null && item!.imageUrl.isNotEmpty)
             ? item.imageUrl
             : (rental.status == RentalStatus.confirmed
@@ -85,7 +87,7 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
         return RentalCard(
           rental: rental,
           itemName: itemName,
-          ownerName: 'Verified Partner',
+          ownerName: isFr ? 'Partenaire Vérifié' : 'Verified Partner',
           itemImageUrl: itemImageUrl,
           onTap: () {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -103,6 +105,11 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<RentalProvider>();
+    final lang = context.watch<LanguageProvider>();
+    final notifProvider = context.watch<NotificationProvider>();
+    final isFr = lang.isFrench;
+    final currency = isFr ? '€' : '\$';
+
     final totalSpent = provider.rentals.fold<double>(
       0.0,
       (sum, r) => sum + r.totalPrice,
@@ -115,21 +122,39 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
         backgroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
-        title: const Text(
-          'My Rentals',
-          style: TextStyle(
+        title: Text(
+          lang.t('rentals_title'),
+          style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w700,
             color: Color(0xFF0F172A),
           ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(
-              Icons.notifications_none_outlined,
-              color: Color(0xFF0F172A),
-            ),
-            onPressed: () {},
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(
+                  Icons.notifications_none_outlined,
+                  color: Color(0xFF0F172A),
+                ),
+                onPressed: () => NotificationsModal.show(context),
+              ),
+              if (notifProvider.unreadCount > 0)
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFEF4444),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
         bottom: PreferredSize(
@@ -155,10 +180,10 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
               indicatorColor: const Color(0xFF2563EB),
               indicatorWeight: 3,
               indicatorSize: TabBarIndicatorSize.tab,
-              tabs: const [
-                Tab(text: 'Active'),
-                Tab(text: 'Pending'),
-                Tab(text: 'Completed'),
+              tabs: [
+                Tab(text: lang.t('tab_active')),
+                Tab(text: lang.t('tab_pending')),
+                Tab(text: lang.t('tab_completed')),
               ],
             ),
           ),
@@ -176,16 +201,16 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
                 final currentStatus = _tabController.index == 0
                     ? 'confirmed'
                     : (_tabController.index == 1 ? 'pending' : 'completed');
-                return _buildRentalList(provider, currentStatus);
+                return _buildRentalList(provider, currentStatus, isFr);
               },
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
 
             // RENTAL INSIGHTS SECTION
-            const Text(
-              'RENTAL INSIGHTS',
-              style: TextStyle(
+            Text(
+              isFr ? 'APERÇU DES DÉPENSES' : 'RENTAL INSIGHTS',
+              style: const TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF64748B),
@@ -197,12 +222,12 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
             Row(
               children: [
                 RentalInsightMetric(
-                  label: 'Total Spent',
-                  value: '\$${totalSpent.toStringAsFixed(2)}',
+                  label: isFr ? 'Total dépensé' : 'Total Spent',
+                  value: '$currency${totalSpent.toStringAsFixed(2)}',
                 ),
                 const SizedBox(width: 12),
                 RentalInsightMetric(
-                  label: 'Items Rented',
+                  label: isFr ? 'Articles loués' : 'Items Rented',
                   value: '$itemsRentedCount',
                 ),
               ],
@@ -239,22 +264,22 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
                     ),
                   ),
                   const SizedBox(width: 14),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Need help with a rental?',
-                          style: TextStyle(
+                          isFr ? 'Besoin d\'aide avec une location ?' : 'Need help with a rental?',
+                          style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: Color(0xFF1E293B),
                           ),
                         ),
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
-                          'Contact support or resolution center',
-                          style: TextStyle(
+                          isFr ? 'Contactez le support ou notre centre d\'aide' : 'Contact support or resolution center',
+                          style: const TextStyle(
                             fontSize: 11,
                             color: Color(0xFF64748B),
                           ),
@@ -275,7 +300,6 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
           ],
         ),
       ),
-      // BottomNavigationBar managed by MainShell
     );
   }
 }

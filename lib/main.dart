@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'core/providers/language_provider.dart';
+import 'core/providers/notification_provider.dart';
 import 'features/auth/screens/profile_screen.dart';
 import 'features/auth/screens/splash_screen.dart';
 import 'features/catalogue/screens/explore_screen.dart';
@@ -25,6 +27,8 @@ class RentItApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => LanguageProvider()),
+        ChangeNotifierProvider(create: (_) => NotificationProvider()),
         ChangeNotifierProvider(create: (_) => RentalProvider()),
       ],
       child: MaterialApp(
@@ -74,6 +78,8 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LanguageProvider>();
+
     final List<Widget> screens = [
       const ExploreScreen(),
       const ExploreScreen(),
@@ -98,25 +104,25 @@ class _MainShellState extends State<MainShell> {
         selectedFontSize: 11,
         unselectedFontSize: 11,
         elevation: 8,
-        items: const [
+        items: [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'Explore',
+            icon: const Icon(Icons.home_outlined),
+            activeIcon: const Icon(Icons.home),
+            label: lang.t('nav_explore'),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.search),
-            label: 'Search',
+            icon: const Icon(Icons.search),
+            label: lang.t('nav_search'),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_today_outlined),
-            activeIcon: Icon(Icons.calendar_today),
-            label: 'Rentals',
+            icon: const Icon(Icons.calendar_today_outlined),
+            activeIcon: const Icon(Icons.calendar_today),
+            label: lang.t('nav_rentals'),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Profile',
+            icon: const Icon(Icons.person_outline),
+            activeIcon: const Icon(Icons.person),
+            label: lang.t('nav_profile'),
           ),
         ],
       ),
