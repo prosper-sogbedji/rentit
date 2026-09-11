@@ -1,0 +1,24 @@
+@startuml
+title RentIt — Cycle de réservation proposé
+[*] --> pending : client crée une demande valide
+pending --> confirmed : admin confirme\ntransaction de disponibilité
+pending --> cancelled : client propriétaire ou admin
+confirmed --> cancelled : client avant début ou admin avant début
+confirmed --> completed : admin après fin et retour du matériel
+cancelled --> [*]
+completed --> [*]
+note right of pending
+  Ne bloque aucune quantité.
+  La confirmation peut échouer si le stock est épuisé.
+  Le prix accepté à la demande est conservé.
+end note
+note right of confirmed
+  Bloque quantity pendant [startDate, endDate[.
+  Dates, article, quantité et prix immuables.
+  L'annulation libère la capacité dans une transaction.
+end note
+note bottom of completed
+  Historique conservé, aucune suppression physique.
+  Retards / prolongations : hors MVP, à définir avant usage réel.
+end note
+@enduml

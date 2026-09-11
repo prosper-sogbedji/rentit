@@ -1,0 +1,100 @@
+@startuml
+title RentIt — Contrat de données cible v1 (proposition)
+hide methods
+skinparam classAttributeIconSize 0
+
+class UserModel <<users/{uid}>> {
+  id : String = Firebase Auth uid
+  name : String
+  email : String
+  phone : String
+  role : UserRole
+  createdAt : DateTime UTC
+}
+class CategoryModel <<categories/{categoryId}>> {
+  id : String
+  name : String
+  imageUrl : String
+}
+class ItemModel <<items/{itemId}>> {
+  id : String
+  name : String
+  description : String
+  categoryId : String
+  imageUrl : String
+  pricePerHourCents : int
+  currency : String = USD
+  quantity : int
+  status : ItemStatus
+  createdAt : DateTime UTC
+  updatedAt : DateTime UTC
+}
+class RentalModel <<rentals/{rentalId}>> {
+  id : String
+  userId : String
+  itemId : String
+  quantity : int
+  startDate : DateTime UTC
+  endDate : DateTime UTC
+  durationMinutes : int
+  pricePerHourCents : int
+  totalPriceCents : int
+  currency : String = USD
+  status : RentalStatus
+  createdAt : DateTime UTC
+  updatedAt : DateTime UTC
+}
+class InventoryLock <<inventoryLocks/{itemId}>> {
+  revision : int
+}
+class ReservationRequest <<reservationRequests/{uid}/requests/{requestId}>> {
+  rentalId : String
+  itemId : String
+  quantity : int
+  startDate : Timestamp
+  endDate : Timestamp
+  expectedPricePerHourCents : int
+}
+enum UserRole {
+  client
+  admin
+}
+enum ItemStatus {
+  available
+  unavailable
+  maintenance
+}
+enum RentalStatus {
+  pending
+  confirmed
+  completed
+  cancelled
+}
+CategoryModel "1" -- "0..*" ItemModel : categoryId
+UserModel "1" -- "0..*" RentalModel : userId
+ItemModel "1" -- "0..*" RentalModel : itemId
+ItemModel "1" -- "1" InventoryLock : verrou serveur
+UserModel "1" -- "0..*" ReservationRequest
+ReservationRequest "1" --> "1" RentalModel : résultat mémorisé
+UserModel --> UserRole
+ItemModel --> ItemStatus
+RentalModel --> RentalStatus
+note bottom of RentalModel
+  Une réservation = un article et une quantité.
+  Tarif copié à la création, immuable ensuite.
+  pending ne bloque pas le stock ; confirmed le bloque.
+  Intervalle [startDate, endDate[ ; fin > début.
+end note
+note bottom of ItemModel
+  quantity = stock total, jamais stock libre instantané.
+  available = autorisé à la location ; disponibilité
+  réelle calculée pour une période et une quantité.
+end note
+note top of UserModel
+  Types affichés = Dart. Stockage des dates : Timestamp.
+  id provient du chemin Firestore (pas de doublon stocké).
+  Tous les champs sont obligatoires ; phone et imageUrl
+  peuvent être vides. Aucun mot de passe dans Firestore.
+  role est une projection serveur des droits Auth.
+end note
+@enduml
