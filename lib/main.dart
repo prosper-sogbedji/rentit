@@ -78,7 +78,9 @@ class _MainShellState extends State<MainShell> {
       const ExploreScreen(),
       const ExploreScreen(),
       const MyRentalsScreen(),
-      const ProfileScreen(),
+      ProfileScreen(
+        onNavigateToRentals: () => setState(() => _currentIndex = 2),
+      ),
     ];
 
     return Scaffold(
