@@ -1,11 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../core/providers/language_provider.dart';
 import '../../reservation/screens/reservation_screen.dart';
 import '../../../models/item_model.dart';
 
-class ItemDetailsScreen extends StatelessWidget {
+class ItemDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> item;
 
   const ItemDetailsScreen({super.key, required this.item});
+
+  @override
+  State<ItemDetailsScreen> createState() => _ItemDetailsScreenState();
+}
+
+class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
+  late final PageController _pageController;
+  int _currentImageIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   Widget _buildFeatureBadge({
     required IconData icon,
@@ -53,14 +75,26 @@ class ItemDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String name = (item['name'] as String?) ?? 'Pro-Series 18V Cordless Combo Kit';
+    final item = widget.item;
+    final lang = context.watch<LanguageProvider>();
+    final isFr = lang.isFrench;
+    final String name = (isFr ? item['nameFr'] : item['nameEn']) ?? (item['name'] as String?) ?? 'Pro-Series 18V Cordless Combo Kit';
+    final String category = (isFr ? item['categoryFr'] : item['categoryEn']) ?? (item['category'] as String?) ?? (isFr ? 'OUTILLAGE' : 'TOOLS');
+    final String city = (item['city'] as String?) ?? 'Paris, France';
+    final String description = (isFr ? item['descFr'] : item['descEn']) ?? (item['description'] as String?) ?? (isFr
+        ? 'Cet équipement de qualité professionnelle est entretenu selon les normes les plus strictes. Nettoyé et inspecté après chaque location.'
+        : 'This professional-grade equipment is maintained to the highest standards. Sanitized and inspected after every rental.');
     final int price = (item['price'] as int?) ?? 45;
     final double rating = (item['rating'] as double?) ?? 4.9;
     final int reviews = (item['reviews'] as int?) ?? 14;
     final Color bgColor = (item['color'] as Color?) ?? const Color(0xFFFFF7ED);
     final IconData icon = (item['icon'] as IconData?) ?? Icons.construction;
     final Color iconColor = (item['iconColor'] as Color?) ?? const Color(0xFFF59E0B);
-    final String? image = item['image'] as String?;
+    final List<String> images = (item['images'] is List)
+        ? (item['images'] as List).map((e) => e.toString()).toList()
+        : (item['image'] != null ? [item['image'].toString()] : []);
+    final currency = isFr ? '€' : '\$';
+    final perDay = isFr ? '/ jour' : '/ day';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -68,7 +102,7 @@ class ItemDetailsScreen extends StatelessWidget {
         children: [
           CustomScrollView(
             slivers: [
-              // ──── Collapsible Hero Image ────
+              // ──── Collapsible Hero Image Carousel ────
               SliverAppBar(
                 expandedHeight: 280,
                 pinned: true,
@@ -110,7 +144,7 @@ class ItemDetailsScreen extends StatelessWidget {
                     ),
                     child: IconButton(
                       icon: const Icon(
-                        Icons.bookmark_border,
+                        Icons.share_outlined,
                         color: Color(0xFF0F172A),
                         size: 20,
                       ),
@@ -118,7 +152,7 @@ class ItemDetailsScreen extends StatelessWidget {
                     ),
                   ),
                   Container(
-                    margin: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
+                    margin: const EdgeInsets.only(right: 16, top: 8, bottom: 8),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
@@ -131,7 +165,7 @@ class ItemDetailsScreen extends StatelessWidget {
                     ),
                     child: IconButton(
                       icon: const Icon(
-                        Icons.share_outlined,
+                        Icons.favorite_border,
                         color: Color(0xFF0F172A),
                         size: 20,
                       ),
@@ -144,16 +178,28 @@ class ItemDetailsScreen extends StatelessWidget {
                     color: bgColor,
                     child: Stack(
                       children: [
-                        Center(
-                          child: image != null
-                              ? Image.asset(
-                                  image,
-                                  width: double.infinity,
-                                  height: double.infinity,
-                                  fit: BoxFit.cover,
-                                )
-                              : Icon(icon, size: 100, color: iconColor),
-                        ),
+                        // Swipable PageView
+                        if (images.isNotEmpty)
+                          PageView.builder(
+                            controller: _pageController,
+                            onPageChanged: (idx) {
+                              setState(() => _currentImageIndex = idx);
+                            },
+                            itemCount: images.length,
+                            itemBuilder: (context, index) {
+                              return Image.asset(
+                                images[index],
+                                width: double.infinity,
+                                height: double.infinity,
+                                fit: BoxFit.cover,
+                              );
+                            },
+                          )
+                        else
+                          Center(
+                            child: Icon(icon, size: 100, color: iconColor),
+                          ),
+
                         // Top Rated badge
                         Positioned(
                           top: 80,
@@ -167,9 +213,9 @@ class ItemDetailsScreen extends StatelessWidget {
                               color: const Color(0xFF2563EB),
                               borderRadius: BorderRadius.circular(20),
                             ),
-                            child: const Text(
-                              'Top Rated',
-                              style: TextStyle(
+                            child: Text(
+                              isFr ? 'Mieux noté' : 'Top Rated',
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
@@ -177,31 +223,81 @@ class ItemDetailsScreen extends StatelessWidget {
                             ),
                           ),
                         ),
-                        // Pagination dots
-                        Positioned(
-                          bottom: 16,
-                          left: 0,
-                          right: 0,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: List.generate(
-                              3,
-                              (i) => Container(
-                                width: i == 0 ? 20 : 6,
-                                height: 6,
-                                margin: const EdgeInsets.symmetric(
-                                  horizontal: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: i == 0
-                                      ? const Color(0xFF2563EB)
-                                      : Colors.white.withValues(alpha: 0.6),
-                                  borderRadius: BorderRadius.circular(3),
+
+                        // Image counter badge (e.g. 1/3)
+                        if (images.length > 1)
+                          Positioned(
+                            top: 80,
+                            right: 16,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.6),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.photo_library_outlined, size: 13, color: Colors.white),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${_currentImageIndex + 1}/${images.length}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                        // Dynamic Pagination dots
+                        if (images.length > 1)
+                          Positioned(
+                            bottom: 16,
+                            left: 0,
+                            right: 0,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: List.generate(
+                                images.length,
+                                (i) => GestureDetector(
+                                  onTap: () {
+                                    _pageController.animateToPage(
+                                      i,
+                                      duration: const Duration(milliseconds: 300),
+                                      curve: Curves.easeInOut,
+                                    );
+                                  },
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 250),
+                                    width: i == _currentImageIndex ? 22 : 7,
+                                    height: 7,
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: i == _currentImageIndex
+                                          ? const Color(0xFF2563EB)
+                                          : Colors.white.withValues(alpha: 0.7),
+                                      borderRadius: BorderRadius.circular(4),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.25),
+                                          blurRadius: 3,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -229,7 +325,7 @@ class ItemDetailsScreen extends StatelessWidget {
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
-                              (item['category'] as String?) ?? 'POWER TOOLS',
+                              category.toUpperCase(),
                               style: const TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
@@ -275,17 +371,17 @@ class ItemDetailsScreen extends StatelessWidget {
                       const SizedBox(height: 10),
 
                       // Location
-                      const Row(
+                      Row(
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.location_on_outlined,
                             size: 15,
                             color: Color(0xFF64748B),
                           ),
-                          SizedBox(width: 4),
+                          const SizedBox(width: 4),
                           Text(
-                            'Downtown, San Francisco',
-                            style: TextStyle(
+                            city,
+                            style: const TextStyle(
                               fontSize: 13,
                               color: Color(0xFF64748B),
                               fontWeight: FontWeight.w500,
@@ -293,6 +389,58 @@ class ItemDetailsScreen extends StatelessWidget {
                           ),
                         ],
                       ),
+
+                      // Thumbnail gallery row if multiple images
+                      if (images.length > 1) ...[
+                        const SizedBox(height: 14),
+                        SizedBox(
+                          height: 64,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: images.length,
+                            separatorBuilder: (context, index) => const SizedBox(width: 10),
+                            itemBuilder: (context, idx) {
+                              final isSelected = idx == _currentImageIndex;
+                              return GestureDetector(
+                                onTap: () {
+                                  _pageController.animateToPage(
+                                    idx,
+                                    duration: const Duration(milliseconds: 300),
+                                    curve: Curves.easeInOut,
+                                  );
+                                },
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  width: 64,
+                                  height: 64,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: isSelected ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0),
+                                      width: isSelected ? 2.5 : 1,
+                                    ),
+                                    boxShadow: [
+                                      if (isSelected)
+                                        BoxShadow(
+                                          color: const Color(0xFF2563EB).withValues(alpha: 0.2),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                    ],
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: Image.asset(
+                                      images[idx],
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
 
                       const SizedBox(height: 20),
 
@@ -307,23 +455,23 @@ class ItemDetailsScreen extends StatelessWidget {
                         children: [
                           _buildFeatureBadge(
                             icon: Icons.electric_bolt_outlined,
-                            label: 'Motor',
+                            label: isFr ? 'Moteur' : 'Motor',
                             value: 'EC Brushless',
                           ),
                           _buildFeatureBadge(
                             icon: Icons.scale_outlined,
-                            label: 'Weight',
-                            value: '12.4 lbs Total',
+                            label: isFr ? 'Poids' : 'Weight',
+                            value: '4.2 kg',
                           ),
                           _buildFeatureBadge(
                             icon: Icons.battery_charging_full_outlined,
-                            label: 'Battery',
+                            label: isFr ? 'Batterie' : 'Battery',
                             value: '5.0Ah Li-Ion',
                           ),
                           _buildFeatureBadge(
                             icon: Icons.handyman_outlined,
-                            label: 'Includes',
-                            value: '7 Tools + Case',
+                            label: isFr ? 'Inclus' : 'Includes',
+                            value: isFr ? 'Mallette & embouts' : 'Case & Accessories',
                           ),
                         ],
                       ),
@@ -331,18 +479,18 @@ class ItemDetailsScreen extends StatelessWidget {
                       const SizedBox(height: 22),
 
                       // ──── About ────
-                      const Text(
-                        'About this equipment',
-                        style: TextStyle(
+                      Text(
+                        isFr ? 'À propos de cet équipement' : 'About this equipment',
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
                           color: Color(0xFF0F172A),
                         ),
                       ),
                       const SizedBox(height: 10),
-                      const Text(
-                        'This professional-grade 18V combo kit includes a high-torque hammer drill, impact driver, circular saw, and large-capacity batteries. Perfect for heavy-duty construction or serious DIY weekend projects. Maintained to professional standards and fully sanitized after every rental.',
-                        style: TextStyle(
+                      Text(
+                        description,
+                        style: const TextStyle(
                           fontSize: 14,
                           color: Color(0xFF475569),
                           height: 1.6,
@@ -352,9 +500,9 @@ class ItemDetailsScreen extends StatelessWidget {
                       const SizedBox(height: 22),
 
                       // ──── Owner Information ────
-                      const Text(
-                        'Owner Information',
-                        style: TextStyle(
+                      Text(
+                        isFr ? 'Informations propriétaire' : 'Owner Information',
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
                           color: Color(0xFF0F172A),
@@ -387,9 +535,9 @@ class ItemDetailsScreen extends StatelessWidget {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Row(
+                                  const Row(
                                     children: [
-                                      const Text(
+                                      Text(
                                         'Marcus V.',
                                         style: TextStyle(
                                           fontSize: 14,
@@ -397,8 +545,8 @@ class ItemDetailsScreen extends StatelessWidget {
                                           color: Color(0xFF0F172A),
                                         ),
                                       ),
-                                      const SizedBox(width: 5),
-                                      const Icon(
+                                      SizedBox(width: 5),
+                                      Icon(
                                         Icons.verified,
                                         size: 14,
                                         color: Color(0xFF2563EB),
@@ -406,9 +554,9 @@ class ItemDetailsScreen extends StatelessWidget {
                                     ],
                                   ),
                                   const SizedBox(height: 3),
-                                  const Text(
-                                    'Response time: ~1 hour',
-                                    style: TextStyle(
+                                  Text(
+                                    isFr ? 'Temps de réponse : ~1 heure' : 'Response time: ~1 hour',
+                                    style: const TextStyle(
                                       fontSize: 12,
                                       color: Color(0xFF94A3B8),
                                     ),
@@ -423,9 +571,9 @@ class ItemDetailsScreen extends StatelessWidget {
                                 size: 14,
                                 color: Color(0xFF2563EB),
                               ),
-                              label: const Text(
-                                'Chat',
-                                style: TextStyle(
+                              label: Text(
+                                isFr ? 'Chat' : 'Chat',
+                                style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                   color: Color(0xFF2563EB),
@@ -458,31 +606,33 @@ class ItemDetailsScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: const Color(0xFFBFDBFE)),
                         ),
-                        child: const Row(
+                        child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.verified_user_outlined,
                               size: 20,
                               color: Color(0xFF2563EB),
                             ),
-                            SizedBox(width: 10),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'RentIt Guarantee Included',
-                                    style: TextStyle(
+                                    isFr ? 'Garantie RentIt incluse' : 'RentIt Guarantee Included',
+                                    style: const TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w700,
                                       color: Color(0xFF0F172A),
                                     ),
                                   ),
-                                  SizedBox(height: 3),
+                                  const SizedBox(height: 3),
                                   Text(
-                                    'This item is covered by our damage protection policy. Rent with peace of mind.',
-                                    style: TextStyle(
+                                    isFr
+                                        ? 'Cet équipement bénéficie de notre assurance casse et support client 24/7.'
+                                        : 'This item is covered by our damage protection policy. Rent with peace of mind.',
+                                    style: const TextStyle(
                                       fontSize: 12,
                                       color: Color(0xFF3B82F6),
                                       height: 1.4,
@@ -528,16 +678,16 @@ class ItemDetailsScreen extends StatelessWidget {
                         text: TextSpan(
                           children: [
                             TextSpan(
-                              text: '\$$price',
+                              text: '$price $currency',
                               style: const TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.w800,
                                 color: Color(0xFF0F172A),
                               ),
                             ),
-                            const TextSpan(
-                              text: ' /h',
-                              style: TextStyle(
+                            TextSpan(
+                              text: ' $perDay',
+                              style: const TextStyle(
                                 fontSize: 13,
                                 color: Color(0xFF94A3B8),
                                 fontWeight: FontWeight.w500,
@@ -546,17 +696,17 @@ class ItemDetailsScreen extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const Row(
+                      Row(
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.check_circle,
                             size: 13,
                             color: Color(0xFF10B981),
                           ),
-                          SizedBox(width: 4),
+                          const SizedBox(width: 4),
                           Text(
-                            'Available Tomorrow',
-                            style: TextStyle(
+                            isFr ? 'Disponible de suite' : 'Available Today',
+                            style: const TextStyle(
                               fontSize: 11,
                               color: Color(0xFF10B981),
                               fontWeight: FontWeight.w600,
@@ -570,14 +720,14 @@ class ItemDetailsScreen extends StatelessWidget {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () {
-                        final price = (item['price'] is num) ? (item['price'] as num).toDouble() : double.tryParse(item['price'].toString()) ?? 15.0;
+                        final priceVal = (item['price'] is num) ? (item['price'] as num).toDouble() : double.tryParse(item['price'].toString()) ?? 15.0;
                         final mappedItem = ItemModel(
                           id: item['id']?.toString() ?? 'item_001',
-                          name: item['name'] ?? 'Unknown Item',
-                          description: item['description'] ?? 'No description',
+                          name: name,
+                          description: description,
                           categoryId: item['categoryId']?.toString() ?? 'tools',
                           imageUrl: item['image'] ?? '',
-                          pricePerDay: price * 24,
+                          pricePerDay: priceVal * 24,
                           quantity: 1,
                           createdAt: DateTime.now(),
                         );
@@ -597,9 +747,9 @@ class ItemDetailsScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      child: const Text(
-                        'Book Now',
-                        style: TextStyle(
+                      child: Text(
+                        isFr ? 'Réserver maintenant' : 'Book Now',
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
                         ),

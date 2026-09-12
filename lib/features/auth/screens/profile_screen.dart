@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/language_provider.dart';
 import '../../../core/providers/notification_provider.dart';
+import '../../../core/providers/user_provider.dart';
 import '../../notifications/screens/notifications_modal.dart';
 import '../../rentals/providers/rental_provider.dart';
 import '../../rentals/screens/my_rentals_screen.dart';
@@ -22,15 +23,6 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // User Profile State
-  String _name = 'Alex Johnson';
-  String _email = 'alex.johnson@rentit.com';
-  String _phone = '+1 (555) 234-5678';
-  String _location = 'Paris, France';
-  Color _avatarColor = const Color(0xFF2563EB);
-  String _avatarInitials = 'AJ';
-  File? _customAvatarFile;
-
   // Security Preferences
   bool _biometricEnabled = true;
   bool _twoFactorEnabled = false;
@@ -82,7 +74,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // ──── 1. VRAIE SÉLECTION D'IMAGE (CAMÉRA & GALERIE NATIVES) ────
+  // ──── 1. SÉLECTION D'IMAGE (CAMÉRA & GALERIE) ────
   Future<void> _pickImage(ImageSource source) async {
     try {
       final picker = ImagePicker();
@@ -94,10 +86,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
 
       if (picked != null) {
-        setState(() {
-          _customAvatarFile = File(picked.path);
-        });
         if (mounted) {
+          context.read<UserProvider>().setCustomAvatarFile(File(picked.path));
           final isFr = context.read<LanguageProvider>().isFrench;
           _showSnack(isFr ? 'Photo de profil mise à jour avec succès !' : 'Profile photo updated successfully!');
         }
@@ -111,6 +101,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _showAvatarPicker() {
     final lang = context.read<LanguageProvider>();
+    final user = context.read<UserProvider>();
     final isFr = lang.isFrench;
 
     showModalBottomSheet(
@@ -121,11 +112,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       builder: (ctx) {
         final avatarPresets = [
-          {'initials': _avatarInitials, 'color': const Color(0xFF2563EB)},
-          {'initials': _avatarInitials, 'color': const Color(0xFF10B981)},
-          {'initials': _avatarInitials, 'color': const Color(0xFF7C3AED)},
-          {'initials': _avatarInitials, 'color': const Color(0xFFF59E0B)},
-          {'initials': _avatarInitials, 'color': const Color(0xFF0F172A)},
+          {'initials': user.avatarInitials, 'color': const Color(0xFF2563EB)},
+          {'initials': user.avatarInitials, 'color': const Color(0xFF10B981)},
+          {'initials': user.avatarInitials, 'color': const Color(0xFF7C3AED)},
+          {'initials': user.avatarInitials, 'color': const Color(0xFFF59E0B)},
+          {'initials': user.avatarInitials, 'color': const Color(0xFF0F172A)},
         ];
 
         return SafeArea(
@@ -163,13 +154,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: avatarPresets.map((preset) {
                     final color = preset['color'] as Color;
-                    final isSelected = _avatarColor == color && _customAvatarFile == null;
+                    final isSelected = user.avatarColor == color && user.customAvatarFile == null;
                     return GestureDetector(
                       onTap: () {
-                        setState(() {
-                          _avatarColor = color;
-                          _customAvatarFile = null;
-                        });
+                        context.read<UserProvider>().setAvatarColor(color);
                         Navigator.pop(ctx);
                         _showSnack(isFr ? 'Couleur d\'avatar mise à jour !' : 'Avatar color updated!');
                       },
@@ -251,7 +239,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   },
                 ),
 
-                if (_customAvatarFile != null)
+                if (user.customAvatarFile != null)
                   ListTile(
                     leading: Container(
                       padding: const EdgeInsets.all(8),
@@ -266,9 +254,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFFEF4444)),
                     ),
                     onTap: () {
-                      setState(() {
-                        _customAvatarFile = null;
-                      });
+                      context.read<UserProvider>().setCustomAvatarFile(null);
                       Navigator.pop(ctx);
                       _showSnack(isFr ? 'Photo supprimée' : 'Photo removed');
                     },
@@ -281,14 +267,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // ──── 2. INFORMATIONS PERSONNELLES (ÉDITION PROPRE ET NATURELLE) ────
+  // ──── 2. INFORMATIONS PERSONNELLES ────
   void _showPersonalInfoModal() {
     final lang = context.read<LanguageProvider>();
+    final user = context.read<UserProvider>();
     final isFr = lang.isFrench;
-    final nameCtrl = TextEditingController(text: _name);
-    final emailCtrl = TextEditingController(text: _email);
-    final phoneCtrl = TextEditingController(text: _phone);
-    final locationCtrl = TextEditingController(text: _location);
+    final nameCtrl = TextEditingController(text: user.name);
+    final emailCtrl = TextEditingController(text: user.email);
+    final phoneCtrl = TextEditingController(text: user.phone);
+    final locationCtrl = TextEditingController(text: user.location);
 
     showModalBottomSheet(
       context: context,
@@ -382,18 +369,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: ElevatedButton(
                     onPressed: () {
                       if (nameCtrl.text.trim().isEmpty) return;
-                      setState(() {
-                        _name = nameCtrl.text.trim();
-                        _email = emailCtrl.text.trim();
-                        _phone = phoneCtrl.text.trim();
-                        _location = locationCtrl.text.trim();
-                        final parts = _name.split(' ');
-                        if (parts.length >= 2) {
-                          _avatarInitials = '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-                        } else if (_name.isNotEmpty) {
-                          _avatarInitials = _name.substring(0, 1).toUpperCase();
-                        }
-                      });
+                      context.read<UserProvider>().updateProfile(
+                        name: nameCtrl.text.trim(),
+                        email: emailCtrl.text.trim(),
+                        phone: phoneCtrl.text.trim(),
+                        location: locationCtrl.text.trim(),
+                      );
                       Navigator.pop(ctx);
                       _showSnack(isFr ? 'Informations mises à jour !' : 'Information updated!');
                     },
@@ -927,6 +908,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final lang = context.watch<LanguageProvider>();
+    final user = context.watch<UserProvider>();
     final notifProvider = context.watch<NotificationProvider>();
     final isFr = lang.isFrench;
 
@@ -984,7 +966,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(width: 6),
 
-          // Vraie cloche de notification avec badge
+          // Cloche de notification avec badge
           Stack(
             alignment: Alignment.center,
             children: [
@@ -1021,7 +1003,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: [
             const SizedBox(height: 20),
 
-            // ──── Profile Card Épurée (Sans badges IA artificiels) ────
+            // ──── Profile Card Synchronisée ────
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -1039,18 +1021,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               child: Column(
                 children: [
-                  // Avatar interactif (caméra/galerie native)
+                  // Avatar interactif (caméra/galerie native synchronisée)
                   GestureDetector(
                     onTap: _showAvatarPicker,
                     child: Stack(
                       children: [
                         CircleAvatar(
                           radius: 46,
-                          backgroundColor: _avatarColor,
-                          backgroundImage: _customAvatarFile != null ? FileImage(_customAvatarFile!) : null,
-                          child: _customAvatarFile == null
+                          backgroundColor: user.avatarColor,
+                          backgroundImage: user.customAvatarFile != null ? FileImage(user.customAvatarFile!) : null,
+                          child: user.customAvatarFile == null
                               ? Text(
-                                  _avatarInitials,
+                                  user.avatarInitials,
                                   style: const TextStyle(
                                     fontSize: 28,
                                     fontWeight: FontWeight.w800,
@@ -1081,9 +1063,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  // Nom réel
+                  // Nom réel synchronisé
                   Text(
-                    _name,
+                    user.name,
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w800,
@@ -1092,14 +1074,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 4),
 
-                  // Email & Ville (sobre et naturel)
+                  // Email & Ville
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Icon(Icons.location_on_outlined, size: 14, color: Color(0xFF64748B)),
                       const SizedBox(width: 4),
                       Text(
-                        _location,
+                        user.location,
                         style: const TextStyle(
                           fontSize: 13,
                           color: Color(0xFF64748B),
@@ -1113,7 +1095,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       const SizedBox(width: 10),
                       Text(
-                        _email,
+                        user.email,
                         style: const TextStyle(
                           fontSize: 13,
                           color: Color(0xFF64748B),
@@ -1125,7 +1107,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   const SizedBox(height: 18),
 
-                  // Statistiques réelles et sobres
+                  // Statistiques réelles
                   Row(
                     children: [
                       Expanded(

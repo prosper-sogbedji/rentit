@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../core/providers/language_provider.dart';
+import '../../../core/providers/user_provider.dart';
 import 'register_screen.dart';
 import '../../../main.dart';
 
@@ -26,8 +29,27 @@ class _LoginScreenState extends State<LoginScreen> {
   void _login() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 1)); // Simulated login
+    await Future.delayed(const Duration(milliseconds: 700)); // Simulated login
     if (!mounted) return;
+
+    final enteredEmail = _emailController.text.trim();
+    if (enteredEmail.isNotEmpty) {
+      final userProvider = context.read<UserProvider>();
+      if (userProvider.email != enteredEmail) {
+        final derivedName = enteredEmail.split('@').first;
+        final formattedName = derivedName
+            .split('.')
+            .map((p) => p.isNotEmpty ? '${p[0].toUpperCase()}${p.substring(1)}' : '')
+            .join(' ');
+        userProvider.updateProfile(
+          name: formattedName.isNotEmpty ? formattedName : userProvider.name,
+          email: enteredEmail,
+          phone: userProvider.phone,
+          location: userProvider.location,
+        );
+      }
+    }
+
     setState(() => _isLoading = false);
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const MainShell()),
@@ -36,6 +58,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LanguageProvider>();
+    final isFr = lang.isFrench;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: SafeArea(
@@ -94,9 +119,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      const Text(
-                        'Welcome back! Sign in to continue',
-                        style: TextStyle(
+                      Text(
+                        isFr ? 'Bon retour ! Connectez-vous pour continuer' : 'Welcome back! Sign in to continue',
+                        style: const TextStyle(
                           fontSize: 14,
                           color: Color(0xFF64748B),
                           fontWeight: FontWeight.w400,
@@ -109,9 +134,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 40),
 
                 // Email field
-                const Text(
-                  'Email Address',
-                  style: TextStyle(
+                Text(
+                  isFr ? 'Adresse e-mail' : 'Email Address',
+                  style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF374151),
@@ -123,7 +148,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   keyboardType: TextInputType.emailAddress,
                   style: const TextStyle(fontSize: 15, color: Color(0xFF0F172A)),
                   decoration: InputDecoration(
-                    hintText: 'you@example.com',
+                    hintText: 'jacob@exemple.com',
                     hintStyle: const TextStyle(color: Color(0xFFCBD5E1)),
                     prefixIcon: const Icon(
                       Icons.mail_outline,
@@ -157,8 +182,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   validator: (val) {
-                    if (val == null || val.isEmpty) return 'Email is required';
-                    if (!val.contains('@')) return 'Enter a valid email';
+                    if (val == null || val.trim().isEmpty) {
+                      return isFr ? "L'e-mail est requis" : 'Email is required';
+                    }
+                    if (!val.contains('@')) {
+                      return isFr ? 'Entrez un e-mail valide' : 'Enter a valid email';
+                    }
                     return null;
                   },
                 ),
@@ -166,9 +195,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 20),
 
                 // Password field
-                const Text(
-                  'Password',
-                  style: TextStyle(
+                Text(
+                  isFr ? 'Mot de passe' : 'Password',
+                  style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF374151),
@@ -226,8 +255,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   validator: (val) {
-                    if (val == null || val.isEmpty) return 'Password is required';
-                    if (val.length < 6) return 'Minimum 6 characters';
+                    if (val == null || val.isEmpty) {
+                      return isFr ? 'Le mot de passe est requis' : 'Password is required';
+                    }
+                    if (val.length < 6) {
+                      return isFr ? '6 caractères minimum' : 'Minimum 6 characters';
+                    }
                     return null;
                   },
                 ),
@@ -240,9 +273,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                     ),
-                    child: const Text(
-                      'Forgot Password?',
-                      style: TextStyle(
+                    child: Text(
+                      isFr ? 'Mot de passe oublié ?' : 'Forgot Password?',
+                      style: const TextStyle(
                         fontSize: 13,
                         color: Color(0xFF2563EB),
                         fontWeight: FontWeight.w600,
@@ -277,9 +310,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               strokeWidth: 2.5,
                             ),
                           )
-                        : const Text(
-                            'Sign In',
-                            style: TextStyle(
+                        : Text(
+                            isFr ? 'Se connecter' : 'Sign In',
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
                               letterSpacing: 0.2,
@@ -296,11 +329,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     Expanded(
                       child: Container(height: 1, color: const Color(0xFFE2E8F0)),
                     ),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 14),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
                       child: Text(
-                        'or',
-                        style: TextStyle(
+                        isFr ? 'ou' : 'or',
+                        style: const TextStyle(
                           fontSize: 13,
                           color: Color(0xFF94A3B8),
                           fontWeight: FontWeight.w500,
@@ -320,9 +353,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text(
-                        "Don't have an account? ",
-                        style: TextStyle(
+                      Text(
+                        isFr ? "Vous n'avez pas de compte ? " : "Don't have an account? ",
+                        style: const TextStyle(
                           fontSize: 14,
                           color: Color(0xFF64748B),
                         ),
@@ -335,9 +368,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           );
                         },
-                        child: const Text(
-                          'Sign Up',
-                          style: TextStyle(
+                        child: Text(
+                          isFr ? "S'inscrire" : 'Sign Up',
+                          style: const TextStyle(
                             fontSize: 14,
                             color: Color(0xFF2563EB),
                             fontWeight: FontWeight.w700,

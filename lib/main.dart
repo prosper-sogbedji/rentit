@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'core/providers/language_provider.dart';
 import 'core/providers/notification_provider.dart';
+import 'core/providers/user_provider.dart';
 import 'features/auth/screens/profile_screen.dart';
 import 'features/auth/screens/splash_screen.dart';
 import 'features/catalogue/screens/explore_screen.dart';
@@ -27,6 +28,7 @@ class RentItApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => LanguageProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
         ChangeNotifierProvider(create: (_) => RentalProvider()),

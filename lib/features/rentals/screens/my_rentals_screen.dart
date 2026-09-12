@@ -7,6 +7,7 @@ import '../../notifications/screens/notifications_modal.dart';
 import '../../../models/rental_model.dart';
 import '../providers/rental_provider.dart';
 import '../widgets/rental_card.dart';
+import '../widgets/rental_details_modal.dart';
 import '../widgets/rental_insight_metric.dart';
 
 class MyRentalsScreen extends StatefulWidget {
@@ -90,11 +91,11 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
           ownerName: isFr ? 'Partenaire Vérifié' : 'Verified Partner',
           itemImageUrl: itemImageUrl,
           onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('$itemName (${rental.status.name.toUpperCase()})'),
-                duration: const Duration(seconds: 1),
-              ),
+            RentalDetailsModal.show(
+              context,
+              rental: rental,
+              item: item,
+              isFr: isFr,
             );
           },
         );
@@ -231,69 +232,6 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
                   value: '$itemsRentedCount',
                 ),
               ],
-            ),
-
-            const SizedBox(height: 24),
-
-            // Help Banner Card
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEFF6FF),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFBFDBFE)),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.blue.withValues(alpha: 0.1),
-                          blurRadius: 4,
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.info_outline,
-                      color: Color(0xFF2563EB),
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          isFr ? 'Besoin d\'aide avec une location ?' : 'Need help with a rental?',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF1E293B),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          isFr ? 'Contactez le support ou notre centre d\'aide' : 'Contact support or resolution center',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFF64748B),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(
-                    Icons.chevron_right,
-                    color: Color(0xFF2563EB),
-                    size: 20,
-                  ),
-                ],
-              ),
             ),
 
             const SizedBox(height: 20),

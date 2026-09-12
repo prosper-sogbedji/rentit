@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../../main.dart';
+import 'package:provider/provider.dart';
+import '../../../core/providers/language_provider.dart';
+import 'email_verification_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -29,11 +31,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void _register() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 1));
+    await Future.delayed(const Duration(milliseconds: 600));
     if (!mounted) return;
     setState(() => _isLoading = false);
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const MainShell()),
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => EmailVerificationScreen(
+          name: _nameController.text.trim(),
+          email: _emailController.text.trim(),
+          phone: _phoneController.text.trim(),
+        ),
+      ),
     );
   }
 
@@ -112,8 +121,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LanguageProvider>();
+    final isFr = lang.isFrench;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -122,7 +142,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 36),
+                const SizedBox(height: 10),
 
                 // Header
                 Center(
@@ -160,9 +180,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      const Text(
-                        'Create Account',
-                        style: TextStyle(
+                      Text(
+                        isFr ? 'Créer un compte' : 'Create Account',
+                        style: const TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.w800,
                           color: Color(0xFF0F172A),
@@ -170,9 +190,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      const Text(
-                        'Join RentIt and start renting today',
-                        style: TextStyle(
+                      Text(
+                        isFr
+                            ? 'Rejoignez RentIt et louez en toute simplicité'
+                            : 'Join RentIt and start renting today',
+                        style: const TextStyle(
                           fontSize: 14,
                           color: Color(0xFF64748B),
                         ),
@@ -181,16 +203,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 36),
+                const SizedBox(height: 32),
 
                 // Full Name
                 _buildField(
                   controller: _nameController,
-                  label: 'Full Name',
-                  hint: 'Alex Johnson',
+                  label: isFr ? 'Nom et prénom' : 'Full Name',
+                  hint: isFr ? 'ex: Jacob Dupont' : 'e.g. Alex Johnson',
                   icon: Icons.person_outline,
                   validator: (val) {
-                    if (val == null || val.isEmpty) return 'Name is required';
+                    if (val == null || val.trim().isEmpty) {
+                      return isFr ? 'Le nom est requis' : 'Name is required';
+                    }
                     return null;
                   },
                 ),
@@ -198,13 +222,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 // Email
                 _buildField(
                   controller: _emailController,
-                  label: 'Email Address',
-                  hint: 'you@example.com',
+                  label: isFr ? 'Adresse e-mail' : 'Email Address',
+                  hint: 'jacob@exemple.com',
                   icon: Icons.mail_outline,
                   keyboardType: TextInputType.emailAddress,
                   validator: (val) {
-                    if (val == null || val.isEmpty) return 'Email is required';
-                    if (!val.contains('@')) return 'Enter a valid email';
+                    if (val == null || val.trim().isEmpty) {
+                      return isFr ? "L'e-mail est requis" : 'Email is required';
+                    }
+                    if (!val.contains('@') || !val.contains('.')) {
+                      return isFr ? 'Entrez un e-mail valide' : 'Enter a valid email';
+                    }
                     return null;
                   },
                 ),
@@ -212,13 +240,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 // Phone
                 _buildField(
                   controller: _phoneController,
-                  label: 'Phone Number',
-                  hint: '+1 555 000 0000',
+                  label: isFr ? 'Numéro de téléphone' : 'Phone Number',
+                  hint: '+33 6 12 34 56 78',
                   icon: Icons.phone_outlined,
                   keyboardType: TextInputType.phone,
                   validator: (val) {
-                    if (val == null || val.isEmpty) {
-                      return 'Phone is required';
+                    if (val == null || val.trim().isEmpty) {
+                      return isFr ? 'Le numéro est requis' : 'Phone is required';
                     }
                     return null;
                   },
@@ -227,7 +255,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 // Password
                 _buildField(
                   controller: _passwordController,
-                  label: 'Password',
+                  label: isFr ? 'Mot de passe' : 'Password',
                   hint: '••••••••',
                   icon: Icons.lock_outline,
                   obscure: _obscurePassword,
@@ -236,9 +264,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   },
                   validator: (val) {
                     if (val == null || val.isEmpty) {
-                      return 'Password is required';
+                      return isFr ? 'Le mot de passe est requis' : 'Password is required';
                     }
-                    if (val.length < 6) return 'Minimum 6 characters';
+                    if (val.length < 6) {
+                      return isFr ? '6 caractères minimum' : 'Minimum 6 characters';
+                    }
                     return null;
                   },
                 ),
@@ -251,19 +281,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: const Color(0xFFBFDBFE)),
                   ),
-                  child: const Row(
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.info_outline,
                         size: 16,
                         color: Color(0xFF2563EB),
                       ),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'By creating an account you agree to our Terms of Service and Privacy Policy.',
-                          style: TextStyle(
+                          isFr
+                              ? 'En créant votre compte, vous acceptez nos conditions générales et notre politique de confidentialité.'
+                              : 'By creating an account you agree to our Terms of Service and Privacy Policy.',
+                          style: const TextStyle(
                             fontSize: 12,
                             color: Color(0xFF3B82F6),
                             height: 1.4,
@@ -300,9 +332,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               strokeWidth: 2.5,
                             ),
                           )
-                        : const Text(
-                            'Create Account',
-                            style: TextStyle(
+                        : Text(
+                            isFr ? 'Créer mon compte' : 'Create Account',
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
                             ),
@@ -317,18 +349,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text(
-                        "Already have an account? ",
-                        style: TextStyle(
+                      Text(
+                        isFr ? 'Vous avez déjà un compte ? ' : 'Already have an account? ',
+                        style: const TextStyle(
                           fontSize: 14,
                           color: Color(0xFF64748B),
                         ),
                       ),
                       GestureDetector(
                         onTap: () => Navigator.of(context).pop(),
-                        child: const Text(
-                          'Sign In',
-                          style: TextStyle(
+                        child: Text(
+                          isFr ? 'Se connecter' : 'Sign In',
+                          style: const TextStyle(
                             fontSize: 14,
                             color: Color(0xFF2563EB),
                             fontWeight: FontWeight.w700,
