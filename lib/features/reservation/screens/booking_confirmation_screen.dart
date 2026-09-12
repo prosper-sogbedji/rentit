@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -46,9 +47,10 @@ class BookingConfirmationScreen extends StatelessWidget {
       startHour % 24,
     );
     final end = start.add(Duration(hours: durationHours));
+    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? 'user_active';
     return RentalModel(
       id: 'booking_${now.millisecondsSinceEpoch}',
-      userId: 'user_current',
+      userId: currentUid,
       itemId: item.id,
       startDate: start,
       endDate: end,
