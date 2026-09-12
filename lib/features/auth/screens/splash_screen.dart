@@ -1,4 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../core/providers/user_provider.dart';
+import '../../../main.dart';
 import 'login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -37,19 +42,48 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    // Redirection fluide après affichage du splash screen
-    Future.delayed(const Duration(milliseconds: 2200), () {
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            transitionDuration: const Duration(milliseconds: 600),
-            pageBuilder: (_, animation, _) => FadeTransition(
-              opacity: animation,
-              child: const LoginScreen(),
-            ),
-          ),
-        );
+    // Redirection fluide après vérification de la session
+    Future.delayed(const Duration(milliseconds: 2000), () async {
+      if (!mounted) return;
+
+      Widget targetScreen = const LoginScreen();
+
+      try {
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser != null && currentUser.email != null) {
+          final doc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(currentUser.uid)
+              .get();
+          if (mounted) {
+            final data = doc.data();
+            final name = (data != null && data['name'] != null && (data['name'] as String).isNotEmpty)
+                ? data['name'] as String
+                : currentUser.email!.split('@').first;
+            final phone = data?['phone'] as String? ?? '';
+            context.read<UserProvider>().updateProfile(
+              name: name,
+              email: currentUser.email!,
+              phone: phone,
+              location: 'Paris, France',
+            );
+            targetScreen = const MainShell();
+          }
+        }
+      } catch (e) {
+        debugPrint('Auto-login check notice: $e');
       }
+
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          transitionDuration: const Duration(milliseconds: 600),
+          pageBuilder: (_, animation, _) => FadeTransition(
+            opacity: animation,
+            child: targetScreen,
+          ),
+        ),
+      );
     });
   }
 

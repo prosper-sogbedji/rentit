@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -796,8 +797,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Text(lang.t('cancel'), style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.pop(ctx);
+                try {
+                  await FirebaseAuth.instance.signOut();
+                } catch (_) {}
+                if (!mounted) return;
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (_) => const LoginScreen()),
                   (route) => false,

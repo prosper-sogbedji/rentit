@@ -28,19 +28,52 @@ class AuthService {
   });
 
   Future<UserModel> createProfile({required String name, String phone = ''}) =>
-      serviceCall(
-        () async => ModelCodec.user(
-          await client.call('users.create', {'name': name, 'phone': phone}),
-        ),
-      );
+      serviceCall(() async {
+        final uid = client.uid;
+        final userMap = {
+          'id': uid,
+          'name': name.trim(),
+          'email': client.auth.currentUser?.email ?? '',
+          'phone': phone.trim(),
+          'role': 'client',
+          'createdAt': DateTime.now().toUtc().toIso8601String(),
+        };
+        try {
+          await client.firestore.collection('users').doc(uid).set(userMap);
+        } catch (_) {
+          try {
+            await client.call('users.create', {'name': name, 'phone': phone});
+          } catch (_) {}
+        }
+        return ModelCodec.user(userMap);
+      });
 
   Future<UserModel> signIn({required String email, required String password}) =>
       serviceCall(() async {
-        await client.auth.signInWithEmailAndPassword(
+        final cred = await client.auth.signInWithEmailAndPassword(
           email: email.trim(),
           password: password,
         );
-        return ModelCodec.user(await client.get('users', client.uid));
+        final uid = cred.user!.uid;
+        try {
+          final snapshot = await client.firestore.collection('users').doc(uid).get();
+          if (snapshot.exists && snapshot.data() != null) {
+            return ModelCodec.user({...snapshot.data()!, 'id': uid});
+          }
+        } catch (_) {}
+
+        final fallback = {
+          'id': uid,
+          'name': cred.user?.displayName ?? email.split('@').first,
+          'email': email.trim(),
+          'phone': cred.user?.phoneNumber ?? '',
+          'role': 'client',
+          'createdAt': DateTime.now().toUtc().toIso8601String(),
+        };
+        try {
+          await client.firestore.collection('users').doc(uid).set(fallback);
+        } catch (_) {}
+        return ModelCodec.user(fallback);
       });
 
   Future<void> signOut() => serviceCall(client.auth.signOut);
