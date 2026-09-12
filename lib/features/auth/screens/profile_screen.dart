@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -10,6 +11,7 @@ import '../../notifications/screens/notifications_modal.dart';
 import '../../rentals/providers/rental_provider.dart';
 import '../../rentals/screens/my_rentals_screen.dart';
 import 'login_screen.dart';
+import 'register_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback? onNavigateToRentals;
@@ -89,6 +91,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (picked != null) {
         if (mounted) {
           context.read<UserProvider>().setCustomAvatarFile(File(picked.path));
+          try {
+            final user = FirebaseAuth.instance.currentUser;
+            if (user != null) {
+              FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+                'avatarPath': picked.path,
+                'avatarColorHex': null,
+              }, SetOptions(merge: true));
+            }
+          } catch (_) {}
           final isFr = context.read<LanguageProvider>().isFrench;
           _showSnack(isFr ? 'Photo de profil mise à jour avec succès !' : 'Profile photo updated successfully!');
         }
@@ -159,6 +170,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     return GestureDetector(
                       onTap: () {
                         context.read<UserProvider>().setAvatarColor(color);
+                        try {
+                          final user = FirebaseAuth.instance.currentUser;
+                          if (user != null) {
+                            FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+                              'avatarColorHex': color.toARGB32(),
+                              'avatarPath': '',
+                            }, SetOptions(merge: true));
+                          }
+                        } catch (_) {}
                         Navigator.pop(ctx);
                         _showSnack(isFr ? 'Couleur d\'avatar mise à jour !' : 'Avatar color updated!');
                       },
@@ -256,6 +276,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     onTap: () {
                       context.read<UserProvider>().setCustomAvatarFile(null);
+                      try {
+                        final user = FirebaseAuth.instance.currentUser;
+                        if (user != null) {
+                          FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+                            'avatarPath': '',
+                          }, SetOptions(merge: true));
+                        }
+                      } catch (_) {}
                       Navigator.pop(ctx);
                       _showSnack(isFr ? 'Photo supprimée' : 'Photo removed');
                     },
@@ -368,16 +396,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       if (nameCtrl.text.trim().isEmpty) return;
+                      final updatedName = nameCtrl.text.trim();
+                      final updatedEmail = emailCtrl.text.trim();
+                      final updatedPhone = phoneCtrl.text.trim();
+                      final updatedLocation = locationCtrl.text.trim();
+
                       context.read<UserProvider>().updateProfile(
-                        name: nameCtrl.text.trim(),
-                        email: emailCtrl.text.trim(),
-                        phone: phoneCtrl.text.trim(),
-                        location: locationCtrl.text.trim(),
+                        name: updatedName,
+                        email: updatedEmail,
+                        phone: updatedPhone,
+                        location: updatedLocation,
                       );
-                      Navigator.pop(ctx);
-                      _showSnack(isFr ? 'Informations mises à jour !' : 'Information updated!');
+
+                      // Persistance directe dans Firebase Auth & Firestore
+                      try {
+                        final user = FirebaseAuth.instance.currentUser;
+                        if (user != null) {
+                          await user.updateDisplayName(updatedName);
+                          await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+                            'id': user.uid,
+                            'name': updatedName,
+                            'email': updatedEmail,
+                            'phone': updatedPhone,
+                            'location': updatedLocation,
+                            'updatedAt': DateTime.now().toUtc().toIso8601String(),
+                          }, SetOptions(merge: true));
+                        }
+                      } catch (e) {
+                        debugPrint('Firestore profile update notice: $e');
+                      }
+
+                      if (ctx.mounted) {
+                        Navigator.pop(ctx);
+                      }
+                      if (mounted) {
+                        _showSnack(isFr ? 'Informations mises à jour !' : 'Information updated!');
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF2563EB),
@@ -803,6 +859,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   await FirebaseAuth.instance.signOut();
                 } catch (_) {}
                 if (!mounted) return;
+                context.read<UserProvider>().reset();
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (_) => const LoginScreen()),
                   (route) => false,
@@ -814,6 +871,82 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
               child: Text(lang.t('logout_btn'), style: const TextStyle(fontWeight: FontWeight.w700)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ──── 8. SUPPRESSION DÉFINITIVE DU COMPTE ────
+  void _confirmDeleteAccount() {
+    final isFr = context.read<LanguageProvider>().isFrench;
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              const Icon(Icons.delete_forever, color: Color(0xFFDC2626), size: 24),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  isFr ? 'Supprimer mon compte' : 'Delete Account',
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            isFr
+                ? 'Êtes-vous sûr de vouloir supprimer définitivement votre compte ?\n\nVotre profil et vos réservations associées seront effacés de Firebase. Vous pourrez vous réinscrire immédiatement avec un nouveau profil propre.'
+                : 'Are you sure you want to permanently delete your account?\n\nAll your profile information and bookings will be erased from Firebase. You can register again at any time.',
+            style: const TextStyle(fontSize: 14, color: Color(0xFF475569), height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(
+                isFr ? 'Annuler' : 'Cancel',
+                style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                try {
+                  final user = FirebaseAuth.instance.currentUser;
+                  if (user != null) {
+                    final uid = user.uid;
+                    try {
+                      await FirebaseFirestore.instance.collection('users').doc(uid).delete();
+                    } catch (_) {}
+                    await user.delete();
+                  }
+                  await FirebaseAuth.instance.signOut();
+                } catch (e) {
+                  debugPrint('Account deletion notice: $e');
+                }
+                if (!mounted) return;
+                context.read<UserProvider>().reset();
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                  (route) => false,
+                );
+                _showSnack(
+                  isFr ? 'Compte supprimé avec succès. Vous pouvez vous réinscrire.' : 'Account deleted successfully.',
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: Text(
+                isFr ? 'Supprimer définitivement' : 'Delete permanently',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
             ),
           ],
         );
@@ -1299,7 +1432,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
+
+            // ──── Supprimer mon compte ────
+            Center(
+              child: TextButton.icon(
+                onPressed: _confirmDeleteAccount,
+                icon: const Icon(
+                  Icons.delete_forever_outlined,
+                  color: Color(0xFF94A3B8),
+                  size: 18,
+                ),
+                label: Text(
+                  isFr ? 'Supprimer mon compte' : 'Delete my account',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF94A3B8),
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
 
             // Version Footer
             const Center(

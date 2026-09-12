@@ -62,9 +62,21 @@ class AuthService {
           }
         } catch (_) {}
 
+        final displayName = cred.user?.displayName;
+        final rawPrefix = email.split('@').first;
+        String fallbackName = displayName != null && displayName.isNotEmpty ? displayName : rawPrefix;
+        if (displayName == null || displayName.isEmpty) {
+          if (rawPrefix.contains('.')) {
+            fallbackName = rawPrefix
+                .split('.')
+                .map((p) => p.isNotEmpty ? '${p[0].toUpperCase()}${p.substring(1)}' : '')
+                .join(' ');
+          }
+        }
+
         final fallback = {
           'id': uid,
-          'name': cred.user?.displayName ?? email.split('@').first,
+          'name': fallbackName,
           'email': email.trim(),
           'phone': cred.user?.phoneNumber ?? '',
           'role': 'client',

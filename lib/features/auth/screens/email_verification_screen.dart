@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/language_provider.dart';
@@ -82,6 +83,26 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       );
     } catch (e) {
       debugPrint('Firebase Auth notice (continuing seamlessly): $e');
+      // Si le compte existait déjà, on le connecte et met à jour son profil avec le nouveau nom
+      try {
+        final client = ServiceClient();
+        final cred = await client.auth.signInWithEmailAndPassword(
+          email: widget.email.trim(),
+          password: widget.password.isNotEmpty ? widget.password : 'RentIt2026!',
+        );
+        final uid = cred.user!.uid;
+        await client.firestore.collection('users').doc(uid).set({
+          'id': uid,
+          'name': widget.name.trim(),
+          'email': widget.email.trim(),
+          'phone': widget.phone.trim(),
+          'role': 'client',
+          'updatedAt': DateTime.now().toUtc().toIso8601String(),
+        }, SetOptions(merge: true));
+        await cred.user?.updateDisplayName(widget.name.trim());
+      } catch (inner) {
+        debugPrint('Fallback profile sync notice: $inner');
+      }
     }
 
     if (!mounted) return;

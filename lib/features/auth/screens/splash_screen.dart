@@ -57,16 +57,36 @@ class _SplashScreenState extends State<SplashScreen>
               .get();
           if (mounted) {
             final data = doc.data();
-            final name = (data != null && data['name'] != null && (data['name'] as String).isNotEmpty)
-                ? data['name'] as String
-                : currentUser.email!.split('@').first;
+            String name = (data != null && data['name'] != null && (data['name'] as String).trim().isNotEmpty)
+                ? (data['name'] as String).trim()
+                : (currentUser.displayName != null && currentUser.displayName!.trim().isNotEmpty
+                    ? currentUser.displayName!.trim()
+                    : '');
+            if (name.isEmpty) {
+              final rawPrefix = currentUser.email!.split('@').first;
+              if (rawPrefix.contains('.')) {
+                name = rawPrefix.split('.').map((p) => p.isNotEmpty ? '${p[0].toUpperCase()}${p.substring(1)}' : '').join(' ');
+              } else {
+                name = rawPrefix;
+              }
+            }
             final phone = data?['phone'] as String? ?? '';
-            context.read<UserProvider>().updateProfile(
+            final location = data?['location'] as String? ?? 'Paris, France';
+            final avatarPath = data?['avatarPath'] as String?;
+            final avatarColorHex = data?['avatarColorHex'] as int?;
+
+            final userProv = context.read<UserProvider>();
+            userProv.updateProfile(
               name: name,
               email: currentUser.email!,
               phone: phone,
-              location: 'Paris, France',
+              location: location,
             );
+            if (avatarPath != null && avatarPath.isNotEmpty) {
+              userProv.setCustomAvatarPath(avatarPath);
+            } else if (avatarColorHex != null) {
+              userProv.setAvatarColor(Color(avatarColorHex));
+            }
             targetScreen = const MainShell();
           }
         }

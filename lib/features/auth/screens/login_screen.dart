@@ -1,9 +1,12 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/language_provider.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/service_client.dart';
+import '../../../models/user_model.dart';
 import 'register_screen.dart';
 import '../../../main.dart';
 
@@ -36,11 +39,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final enteredEmail = _emailController.text.trim();
 
-    // Connexion réelle Firebase Auth si disponible
+    // Connexion réelle Firebase Auth & Firestore si disponible
+    UserModel? userModel;
     try {
       final client = ServiceClient();
       final authService = AuthService(client);
-      await authService.signIn(
+      userModel = await authService.signIn(
         email: enteredEmail,
         password: _passwordController.text,
       );
@@ -52,21 +56,65 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (enteredEmail.isNotEmpty) {
       final userProvider = context.read<UserProvider>();
-      if (userProvider.email != enteredEmail) {
-        final derivedName = enteredEmail.split('@').first;
-        final formattedName = derivedName
-            .split('.')
-            .map((p) => p.isNotEmpty ? '${p[0].toUpperCase()}${p.substring(1)}' : '')
-            .join(' ');
-        userProvider.updateProfile(
-          name: formattedName.isNotEmpty ? formattedName : userProvider.name,
-          email: enteredEmail,
-          phone: userProvider.phone,
-          location: userProvider.location,
-        );
+      String loadedName = userModel?.name ?? '';
+      String loadedPhone = userModel?.phone ?? '';
+      String loadedLocation = 'Paris, France';
+      String? avatarPath;
+      int? avatarColorHex;
+
+      try {
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        if (uid != null) {
+          final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+          final data = doc.data();
+          if (data != null) {
+            final docName = data['name'] as String?;
+            if (docName != null && docName.trim().isNotEmpty) {
+              loadedName = docName.trim();
+            }
+            final docPhone = data['phone'] as String?;
+            if (docPhone != null && docPhone.trim().isNotEmpty) {
+              loadedPhone = docPhone.trim();
+            }
+            final docLoc = data['location'] as String?;
+            if (docLoc != null && docLoc.trim().isNotEmpty) {
+              loadedLocation = docLoc.trim();
+            }
+            avatarPath = data['avatarPath'] as String?;
+            avatarColorHex = data['avatarColorHex'] as int?;
+          }
+        }
+      } catch (e) {
+        debugPrint('Firestore profile fetch notice: $e');
+      }
+
+      if (loadedName.isEmpty) {
+        final rawPrefix = enteredEmail.split('@').first;
+        if (rawPrefix.contains('.')) {
+          loadedName = rawPrefix
+              .split('.')
+              .map((p) => p.isNotEmpty ? '${p[0].toUpperCase()}${p.substring(1)}' : '')
+              .join(' ');
+        } else {
+          loadedName = userProvider.name.isNotEmpty ? userProvider.name : rawPrefix;
+        }
+      }
+
+      userProvider.updateProfile(
+        name: loadedName,
+        email: enteredEmail,
+        phone: loadedPhone.isNotEmpty ? loadedPhone : userProvider.phone,
+        location: loadedLocation,
+      );
+
+      if (avatarPath != null && avatarPath.isNotEmpty) {
+        userProvider.setCustomAvatarPath(avatarPath);
+      } else if (avatarColorHex != null) {
+        userProvider.setAvatarColor(Color(avatarColorHex));
       }
     }
 
+    if (!mounted) return;
     setState(() => _isLoading = false);
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const MainShell()),
