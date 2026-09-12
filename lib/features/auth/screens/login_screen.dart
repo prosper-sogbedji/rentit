@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/language_provider.dart';
 import '../../../core/providers/user_provider.dart';
+import '../../../core/services/auth_service.dart';
+import '../../../core/services/service_client.dart';
 import 'register_screen.dart';
 import '../../../main.dart';
 
@@ -33,6 +35,21 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     final enteredEmail = _emailController.text.trim();
+
+    // Connexion réelle Firebase Auth si disponible
+    try {
+      final client = ServiceClient();
+      final authService = AuthService(client);
+      await authService.signIn(
+        email: enteredEmail,
+        password: _passwordController.text,
+      );
+    } catch (e) {
+      debugPrint('Firebase signIn notice: $e');
+    }
+
+    if (!mounted) return;
+
     if (enteredEmail.isNotEmpty) {
       final userProvider = context.read<UserProvider>();
       if (userProvider.email != enteredEmail) {

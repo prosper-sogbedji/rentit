@@ -1,134 +1,131 @@
-import '../../models/item_model.dart';
 import '../../models/rental_model.dart';
+import 'model_codec.dart';
+import 'service_client.dart';
+import 'service_exception.dart';
 
-/// Service métier gérant les locations (Rentals).
-///
-/// Implémente actuellement un stockage en mémoire avec des données initiales.
-/// Conçu pour être branché directement sur Cloud Firestore (architecture Katema).
+class RentalQuote {
+  final int durationMinutes;
+  final int pricePerHourCents;
+  final int totalPriceCents;
+  final String currency;
+
+  const RentalQuote({
+    required this.durationMinutes,
+    required this.pricePerHourCents,
+    required this.totalPriceCents,
+    this.currency = 'USD',
+  });
+
+  factory RentalQuote.fromMap(Map<String, dynamic> map) {
+    if (map['durationMinutes'] is! int ||
+        map['pricePerHourCents'] is! int ||
+        map['totalPriceCents'] is! int ||
+        map['currency'] != 'USD') {
+      throw const ServiceException('invalid-data', 'Devis invalide.');
+    }
+    return RentalQuote(
+      durationMinutes: map['durationMinutes'] as int,
+      pricePerHourCents: map['pricePerHourCents'] as int,
+      totalPriceCents: map['totalPriceCents'] as int,
+    );
+  }
+}
+
+class AvailabilityResult {
+  final bool available;
+  final int availableQuantity;
+  const AvailabilityResult({
+    required this.available,
+    required this.availableQuantity,
+  });
+}
+
 class RentalService {
-  // Liste en mémoire des locations
-  final List<RentalModel> _rentals = [];
+  final ServiceClient client;
+  RentalService(this.client);
 
-  // Cache des objets liés aux locations (pour afficher immédiatement le titre, l'image, etc.)
-  final Map<String, ItemModel> _rentalItems = {};
+  Map<String, dynamic> _period(String itemId, DateTime start, DateTime end) => {
+    'itemId': itemId,
+    'startDate': start.toUtc().toIso8601String(),
+    'endDate': end.toUtc().toIso8601String(),
+  };
 
-  RentalService() {
-    _initSampleData();
-  }
+  Future<RentalQuote> getQuote({
+    required String itemId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) => serviceCall(
+    () async => RentalQuote.fromMap(
+      await client.call('rentals.quote', _period(itemId, startDate, endDate)),
+    ),
+  );
 
-  void _initSampleData() {
-    final now = DateTime.now();
-
-    // Équipements de démonstration initiaux
-    final drill = ItemModel(
-      id: 'item_drill_01',
-      name: 'Professional Cordless Drill',
-      description: 'High performance 20V cordless drill kit with 2 batteries.',
-      categoryId: 'tools',
-      imageUrl: 'assets/images/drill.jpg',
-      pricePerDay: 15.00,
-      quantity: 3,
-      createdAt: now.subtract(const Duration(days: 30)),
+  Future<AvailabilityResult> getAvailability({
+    required String itemId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) => serviceCall(() async {
+    final data = await client.call(
+      'rentals.availability',
+      _period(itemId, startDate, endDate),
     );
-
-    final camera = ItemModel(
-      id: 'item_camera_02',
-      name: 'DSLR Camera 4K Master',
-      description: 'Professional cinema camera package with 24-70mm lens.',
-      categoryId: 'electronics',
-      imageUrl: 'assets/images/camera.jpg',
-      pricePerDay: 35.00,
-      quantity: 1,
-      createdAt: now.subtract(const Duration(days: 20)),
-    );
-
-    final jackhammer = ItemModel(
-      id: 'item_jackhammer_03',
-      name: 'Heavy Duty Jackhammer',
-      description: 'Industrial demolition breaker for concrete breaking.',
-      categoryId: 'construction',
-      imageUrl: 'assets/images/jackhammer.jpg',
-      pricePerDay: 40.00,
-      quantity: 2,
-      createdAt: now.subtract(const Duration(days: 15)),
-    );
-
-    _rentalItems[drill.id] = drill;
-    _rentalItems[camera.id] = camera;
-    _rentalItems[jackhammer.id] = jackhammer;
-
-    _rentals.addAll([
-      RentalModel(
-        id: 'rent_001',
-        userId: 'user_current',
-        itemId: drill.id,
-        startDate: DateTime(2026, 10, 12),
-        endDate: DateTime(2026, 10, 15),
-        duration: 3,
-        totalPrice: 45.00,
-        status: RentalStatus.confirmed,
-        createdAt: now.subtract(const Duration(days: 2)),
-      ),
-      RentalModel(
-        id: 'rent_002',
-        userId: 'user_current',
-        itemId: camera.id,
-        startDate: DateTime(2026, 10, 20),
-        endDate: DateTime(2026, 10, 22),
-        duration: 2,
-        totalPrice: 70.00,
-        status: RentalStatus.pending,
-        createdAt: now.subtract(const Duration(days: 1)),
-      ),
-      RentalModel(
-        id: 'rent_003',
-        userId: 'user_current',
-        itemId: jackhammer.id,
-        startDate: DateTime(2026, 9, 1),
-        endDate: DateTime(2026, 9, 4),
-        duration: 3,
-        totalPrice: 120.00,
-        status: RentalStatus.completed,
-        createdAt: now.subtract(const Duration(days: 10)),
-      ),
-    ]);
-  }
-
-  /// Récupère toutes les locations
-  Future<List<RentalModel>> getRentals() async {
-    // Simule une micro-latence asynchrone type Firestore
-    await Future.delayed(const Duration(milliseconds: 50));
-    return List.unmodifiable(_rentals);
-  }
-
-  /// Récupère les locations filtrées par statut
-  Future<List<RentalModel>> getRentalsByStatus(RentalStatus status) async {
-    await Future.delayed(const Duration(milliseconds: 50));
-    return _rentals.where((r) => r.status == status).toList();
-  }
-
-  /// Ajoute une nouvelle réservation
-  Future<RentalModel> createRental(RentalModel rental, {ItemModel? item}) async {
-    await Future.delayed(const Duration(milliseconds: 100));
-    if (item != null) {
-      _rentalItems[rental.itemId] = item;
+    if (data['available'] is! bool || data['availableQuantity'] is! int) {
+      throw const ServiceException('invalid-data', 'Disponibilité invalide.');
     }
-    // Insérer en tête de liste pour afficher les réservations récentes en premier
-    _rentals.insert(0, rental);
-    return rental;
+    return AvailabilityResult(
+      available: data['available'] as bool,
+      availableQuantity: data['availableQuantity'] as int,
+    );
+  });
+
+  /// One material unit per rental, matching the existing RentalModel.
+  /// Keep requestId unchanged when retrying after a connection failure.
+  Future<RentalModel> create({
+    required String requestId,
+    required String itemId,
+    required DateTime startDate,
+    required DateTime endDate,
+    required int expectedPricePerHourCents,
+  }) => serviceCall(
+    () async => ModelCodec.rental(
+      await client.call('rentals.create', {
+        ..._period(itemId, startDate, endDate),
+        'requestId': requestId,
+        'expectedPricePerHourCents': expectedPricePerHourCents,
+      }),
+    ),
+  );
+
+  Future<RentalModel> get(String id) => serviceCall(
+    () async => ModelCodec.rental(await client.get('rentals', id)),
+  );
+
+  Stream<List<RentalModel>> watchMine() {
+    final uid = client.uid;
+    return serviceStream(
+      client.firestore
+          .collection('rentals')
+          .where('userId', isEqualTo: uid)
+          .orderBy('createdAt', descending: true)
+          .snapshots()
+          .map(
+            (snapshot) => snapshot.docs
+                .map((doc) => ModelCodec.rental({...doc.data(), 'id': doc.id}))
+                .toList(),
+          ),
+    );
   }
 
-  /// Récupère l'article correspondant à un itemId
-  ItemModel? getItem(String itemId) {
-    return _rentalItems[itemId];
-  }
+  /// Changes status only. Financial fields and reserved dates are immutable.
+  Future<RentalModel> updateStatus(String id, String status) => serviceCall(
+    () async => ModelCodec.rental(
+      await client.call('rentals.update', {'id': id, 'status': status}),
+    ),
+  );
 
-  /// Met à jour le statut d'une location
-  Future<void> updateStatus(String rentalId, RentalStatus newStatus) async {
-    await Future.delayed(const Duration(milliseconds: 50));
-    final index = _rentals.indexWhere((r) => r.id == rentalId);
-    if (index != -1) {
-      _rentals[index] = _rentals[index].copyWith(status: newStatus);
-    }
-  }
+  /// Logical deletion (cancellation), preserving rental history.
+  Future<RentalModel> delete(String id) => serviceCall(
+    () async =>
+        ModelCodec.rental(await client.call('rentals.delete', {'id': id})),
+  );
 }

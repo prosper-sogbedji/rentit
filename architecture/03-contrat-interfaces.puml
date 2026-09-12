@@ -1,0 +1,86 @@
+@startuml
+title RentIt — Contrats Dart proposés pour les interfaces
+skinparam classAttributeIconSize 0
+interface AuthService {
+  + watchSession() : Stream<UserModel?>
+  + signUp(name: String, email: String, password: String, phone: String) : Future<UserModel>
+  + signIn(email: String, password: String) : Future<UserModel>
+  + signOut() : Future<void>
+  + updateProfile(name: String, phone: String) : Future<UserModel>
+}
+interface CatalogueService {
+  + watchCategories() : Stream<List<CategoryModel>>
+  + listItems(categoryId: String?, cursor: String?, limit: int) : Future<ItemPage>
+  + getItem(itemId: String) : Future<ItemModel>
+}
+interface RentalService {
+  + getQuote(input: QuoteInput) : Future<RentalQuote>
+  + getAvailability(input: QuoteInput) : Future<AvailabilityResult>
+  + createRental(input: CreateRentalInput) : Future<RentalModel>
+  + watchMyRentals() : Stream<List<RentalModel>>
+  + cancelRental(rentalId: String) : Future<RentalModel>
+}
+interface AdminService {
+  + createCategory(name: String, imageUrl: String) : Future<CategoryModel>
+  + updateCategory(id: String, name: String, imageUrl: String) : Future<CategoryModel>
+  + deleteCategory(id: String) : Future<void>
+  + createItem(input: ItemInput) : Future<ItemModel>
+  + updateItem(id: String, input: ItemInput) : Future<ItemModel>
+  + deleteItem(id: String) : Future<void>
+  + confirmRental(rentalId: String) : Future<RentalModel>
+  + completeRental(rentalId: String) : Future<RentalModel>
+}
+class QuoteInput {
+  itemId : String
+  quantity : int
+  startDate : DateTime UTC
+  endDate : DateTime UTC
+}
+class CreateRentalInput {
+  requestId : String (UUID)
+  expectedPricePerHourCents : int
+}
+QuoteInput <|-- CreateRentalInput
+class RentalQuote {
+  durationMinutes : int
+  pricePerHourCents : int
+  totalPriceCents : int
+  currency : String = USD
+}
+class AvailabilityResult {
+  available : bool
+  availableQuantity : int
+}
+class ItemInput {
+  name : String
+  description : String
+  categoryId : String
+  imageUrl : String
+  pricePerHourCents : int
+  quantity : int
+  status : ItemStatus
+}
+class ItemPage {
+  items : List<ItemModel>
+  nextCursor : String?
+}
+class ServiceFailure {
+  code : String
+  message : String
+  field : String?
+}
+note bottom of ServiceFailure
+  Codes stables : unauthenticated, permission-denied,
+  invalid-argument, not-found, unavailable-stock,
+  price-changed, invalid-transition, conflict,
+  network-error, internal.
+  Les Future échouent avec ServiceFailure ;
+  les Stream émettent l'erreur via leur canal d'erreur.
+end note
+note bottom of RentalService
+  userId vient de la session, jamais de la saisie.
+  Devis et disponibilité sont indicatifs jusqu'à confirmation.
+  Calendrier : appeler getAvailability pour la période sélectionnée.
+  Aucun accès aux réservations des autres clients.
+end note
+@enduml

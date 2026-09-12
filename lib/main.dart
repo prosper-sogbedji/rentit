@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -9,8 +10,9 @@ import 'features/auth/screens/splash_screen.dart';
 import 'features/catalogue/screens/explore_screen.dart';
 import 'features/rentals/providers/rental_provider.dart';
 import 'features/rentals/screens/my_rentals_screen.dart';
+import 'firebase_options.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -18,6 +20,13 @@ void main() {
       statusBarIconBrightness: Brightness.dark,
     ),
   );
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    debugPrint('Firebase initialization notice: $e');
+  }
   runApp(const RentItApp());
 }
 

@@ -1,0 +1,31 @@
+@startuml
+title RentIt — Confirmation sans surréservation
+actor Administrateur as Admin
+participant "RentalService / AdminService" as Service
+participant "Fonction serveur" as Server
+database Firestore as DB
+Admin -> Service : confirmRental(rentalId)
+Service -> Server : appel authentifié
+Server -> Server : vérifier identité et rôle admin
+group Transaction serveur (réessayée en cas de conflit)
+  Server -> DB : lire inventoryLocks/{itemId}, rental, item
+  Server -> Server : vérifier pending, article disponible, dates futures
+  Server -> DB : lire les confirmed de cet article\navec startDate < fin demandée
+  DB --> Server : réservations candidates
+  Server -> Server : garder endDate > début demandé\ncalculer le pic simultané des quantités
+  alt pic + quantité demandée <= stock total
+    Server -> DB : écrire status=confirmed, updatedAt\nincrémenter revision du verrou
+  else stock insuffisant ou transition invalide
+    Server -> Server : abandonner, ServiceFailure
+  end
+end
+Server --> Service : RentalModel confirmé ou erreur stable
+Service --> Admin : afficher résultat
+note over Server, DB
+  Toutes les lectures précèdent les écritures.
+  Toute mutation affectant la capacité utilise le même verrou :
+  confirmation, annulation, clôture, stock, statut article, suppression.
+  Le verrou préexiste dès la création de l'article.
+  Aucun accès client aux verrous, aucune écriture directe des rentals.
+end note
+@enduml
