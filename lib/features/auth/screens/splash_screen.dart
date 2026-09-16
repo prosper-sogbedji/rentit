@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/user_provider.dart';
+import '../../rentals/providers/rental_provider.dart';
 import '../../../main.dart';
 import 'login_screen.dart';
 
@@ -57,24 +58,40 @@ class _SplashScreenState extends State<SplashScreen>
               .get();
           if (mounted) {
             final data = doc.data();
-            String name = (data != null && data['name'] != null && (data['name'] as String).trim().isNotEmpty)
-                ? (data['name'] as String).trim()
-                : (currentUser.displayName != null && currentUser.displayName!.trim().isNotEmpty
-                    ? currentUser.displayName!.trim()
-                    : '');
+            // Priorité : Firestore > Firebase Auth displayName > email prefix
+            String name = '';
+            if (data != null && data['name'] != null && (data['name'] as String).trim().isNotEmpty) {
+              name = (data['name'] as String).trim();
+              // Synchroniser aussi dans Firebase Auth si absent
+              if (currentUser.displayName == null || currentUser.displayName!.trim().isEmpty) {
+                try { await currentUser.updateDisplayName(name); } catch (_) {}
+              }
+            } else if (currentUser.displayName != null && currentUser.displayName!.trim().isNotEmpty) {
+              name = currentUser.displayName!.trim();
+              // Synchroniser dans Firestore si absent
+              try {
+                await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).set(
+                  {'name': name}, SetOptions(merge: true),
+                );
+              } catch (_) {}
+            }
+            // Dernier recours : préfixe email capitalisé proprement
             if (name.isEmpty) {
               final rawPrefix = currentUser.email!.split('@').first;
               if (rawPrefix.contains('.')) {
                 name = rawPrefix.split('.').map((p) => p.isNotEmpty ? '${p[0].toUpperCase()}${p.substring(1)}' : '').join(' ');
               } else {
-                name = rawPrefix;
+                // Capitaliser la première lettre seulement
+                name = rawPrefix.isNotEmpty ? '${rawPrefix[0].toUpperCase()}${rawPrefix.substring(1)}' : rawPrefix;
               }
             }
             final phone = data?['phone'] as String? ?? '';
-            final location = data?['location'] as String? ?? 'Paris, France';
+            final location = data?['location'] as String? ?? 'Cotonou, Bénin';
             final avatarPath = data?['avatarPath'] as String?;
+            final avatarBase64 = data?['avatarBase64'] as String?;
             final avatarColorHex = data?['avatarColorHex'] as int?;
 
+            if (!mounted) return;
             final userProv = context.read<UserProvider>();
             userProv.updateProfile(
               name: name,
@@ -82,10 +99,18 @@ class _SplashScreenState extends State<SplashScreen>
               phone: phone,
               location: location,
             );
-            if (avatarPath != null && avatarPath.isNotEmpty) {
-              userProv.setCustomAvatarPath(avatarPath);
-            } else if (avatarColorHex != null) {
+            // Charger l'avatar synchronisé (Base64 Firestore + cache local de l'appareil)
+            await userProv.syncUserAvatar(
+              currentUser.uid,
+              avatarBase64: avatarBase64,
+              avatarPath: avatarPath,
+            );
+            if (!userProv.hasCustomAvatar && avatarColorHex != null) {
               userProv.setAvatarColor(Color(avatarColorHex));
+            }
+            // Charger les réservations réelles de l'utilisateur depuis Firestore
+            if (mounted) {
+              await context.read<RentalProvider>().onUserLoggedIn();
             }
             targetScreen = const MainShell();
           }

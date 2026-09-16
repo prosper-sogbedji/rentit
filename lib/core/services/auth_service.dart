@@ -19,10 +19,15 @@ class AuthService {
         'Nom ou téléphone invalide.',
       );
     }
-    await client.auth.createUserWithEmailAndPassword(
+    final cred = await client.auth.createUserWithEmailAndPassword(
       email: email.trim(),
       password: password,
     );
+    // Sauvegarder le displayName directement dans Firebase Auth
+    // Comme ça, même si Firestore échoue, le vrai nom est toujours disponible
+    try {
+      await cred.user?.updateDisplayName(name.trim());
+    } catch (_) {}
     // Keep the Auth session if profile creation fails so it can be retried.
     return createProfile(name: name, phone: phone);
   });

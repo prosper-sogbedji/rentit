@@ -64,9 +64,14 @@ class RentalModel {
   factory RentalModel.fromMap(Map<String, dynamic> map, {String? docId}) {
     DateTime parseDate(dynamic val) {
       if (val == null) return DateTime.now();
+      if (val is DateTime) return val;
       if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
-      if (val.toDate != null) return val.toDate();
-      return DateTime.now();
+      if (val is int) return DateTime.fromMillisecondsSinceEpoch(val);
+      try {
+        return (val as dynamic).toDate() as DateTime;
+      } catch (_) {
+        return DateTime.now();
+      }
     }
 
     return RentalModel(

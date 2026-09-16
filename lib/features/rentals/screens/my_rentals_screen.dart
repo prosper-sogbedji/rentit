@@ -25,6 +25,11 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<RentalProvider>().loadRentals();
+      }
+    });
   }
 
   @override
@@ -33,7 +38,7 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
     super.dispose();
   }
 
-  Widget _buildRentalList(RentalProvider provider, String statusName, bool isFr) {
+  Widget _buildRentalList(RentalProvider provider, int tabIndex, bool isFr) {
     if (provider.isLoading && provider.rentals.isEmpty) {
       return const Center(
         child: Padding(
@@ -43,9 +48,18 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
       );
     }
 
-    final rentals = provider.rentals
-        .where((r) => r.status.name.toLowerCase() == statusName.toLowerCase())
-        .toList();
+    final rentals = provider.rentals.where((r) {
+      if (tabIndex == 0) {
+        // Tab Actives : uniquement les locations confirmées
+        return r.status == RentalStatus.confirmed;
+      } else if (tabIndex == 1) {
+        // Tab En attente
+        return r.status == RentalStatus.pending;
+      } else {
+        // Tab Terminées
+        return r.status == RentalStatus.completed || r.status == RentalStatus.cancelled;
+      }
+    }).toList();
 
     if (rentals.isEmpty) {
       return Center(
@@ -190,52 +204,53 @@ class _MyRentalsScreenState extends State<MyRentalsScreen>
           ),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Filtered Rentals List based on active tab
-            AnimatedBuilder(
-              animation: _tabController,
-              builder: (context, child) {
-                final currentStatus = _tabController.index == 0
-                    ? 'confirmed'
-                    : (_tabController.index == 1 ? 'pending' : 'completed');
-                return _buildRentalList(provider, currentStatus, isFr);
-              },
-            ),
-
-            const SizedBox(height: 16),
-
-            // RENTAL INSIGHTS SECTION
-            Text(
-              isFr ? 'APERÇU DES DÉPENSES' : 'RENTAL INSIGHTS',
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF64748B),
-                letterSpacing: 0.8,
+      body: RefreshIndicator(
+        onRefresh: () => context.read<RentalProvider>().loadRentals(),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Filtered Rentals List based on active tab
+              AnimatedBuilder(
+                animation: _tabController,
+                builder: (context, child) {
+                  return _buildRentalList(provider, _tabController.index, isFr);
+                },
               ),
-            ),
-            const SizedBox(height: 12),
 
-            Row(
-              children: [
-                RentalInsightMetric(
-                  label: isFr ? 'Total dépensé' : 'Total Spent',
-                  value: '$currency${totalSpent.toStringAsFixed(2)}',
-                ),
-                const SizedBox(width: 12),
-                RentalInsightMetric(
-                  label: isFr ? 'Articles loués' : 'Items Rented',
-                  value: '$itemsRentedCount',
-                ),
-              ],
-            ),
+              const SizedBox(height: 16),
 
-            const SizedBox(height: 20),
-          ],
+              // RENTAL INSIGHTS SECTION
+              Text(
+                isFr ? 'APERÇU DES DÉPENSES' : 'RENTAL INSIGHTS',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF64748B),
+                  letterSpacing: 0.8,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              Row(
+                children: [
+                  RentalInsightMetric(
+                    label: isFr ? 'Total dépensé' : 'Total Spent',
+                    value: '$currency${totalSpent.toStringAsFixed(2)}',
+                  ),
+                  const SizedBox(width: 12),
+                  RentalInsightMetric(
+                    label: isFr ? 'Articles loués' : 'Items Rented',
+                    value: '$itemsRentedCount',
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
     );

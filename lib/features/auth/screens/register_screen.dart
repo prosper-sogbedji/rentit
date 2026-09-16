@@ -1,7 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/language_provider.dart';
+import '../../../core/widgets/phone_input_field.dart';
 import 'email_verification_screen.dart';
+import 'login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -12,6 +16,7 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _phoneKey = GlobalKey<PhoneInputFieldState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -31,18 +36,181 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void _register() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => EmailVerificationScreen(
-          name: _nameController.text.trim(),
-          email: _emailController.text.trim(),
-          phone: _phoneController.text.trim(),
-          password: _passwordController.text,
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim().toLowerCase();
+    final phone = _phoneKey.currentState?.fullPhoneNumber ?? _phoneController.text.trim();
+    final password = _passwordController.text;
+    final isFr = context.read<LanguageProvider>().isFrench;
+
+    // Création directe du compte — Firebase retourne 'email-already-in-use'
+    // si l'email est déjà enregistré. Cette approche est recommandée et évite
+    // le risque de blocage par 'too-many-requests' de la technique précédente.
+    try {
+      final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      try {
+        await cred.user?.updateDisplayName(name);
+      } catch (_) {}
+
+      try {
+        final uid = cred.user!.uid;
+        await FirebaseFirestore.instance.collection('users').doc(uid).set({
+          'id': uid,
+          'name': name,
+          'email': email,
+          'phone': phone,
+          'role': 'client',
+          'createdAt': DateTime.now().toUtc().toIso8601String(),
+        }, SetOptions(merge: true));
+      } catch (_) {}
+
+      // Envoi du vrai e-mail de confirmation officiel Firebase
+      try {
+        await cred.user?.sendEmailVerification();
+      } catch (e) {
+        debugPrint('sendEmailVerification error: $e');
+      }
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => EmailVerificationScreen(
+            name: name,
+            email: email,
+            phone: phone,
+            password: password,
+          ),
         ),
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      final code = e.code.toLowerCase();
+      final msg = (e.message ?? '').toLowerCase();
+      if (code == 'email-already-in-use' ||
+          code.contains('already') ||
+          code.contains('email_exists') ||
+          msg.contains('already') ||
+          msg.contains('email exists')) {
+        _showAccountExistsDialog(email, isFr);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message ?? (isFr ? 'Erreur lors de l\'inscription' : 'Registration error')),
+            backgroundColor: const Color(0xFFEF4444),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      final err = e.toString().toLowerCase();
+      if (err.contains('already') || err.contains('email_exists')) {
+        _showAccountExistsDialog(email, isFr);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isFr ? 'Erreur : $e' : 'Error: $e'),
+            backgroundColor: const Color(0xFFEF4444),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showAccountExistsDialog(String email, bool isFr) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Colors.white,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.person_outline, color: Color(0xFFD97706), size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                isFr ? 'Compte existant' : 'Account Exists',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isFr
+                  ? 'Un compte est déjà associé à l\'adresse e-mail :'
+                  : 'An account is already associated with the email address:',
+              style: const TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Text(
+                email,
+                style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF0F172A), fontSize: 14),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              isFr
+                  ? 'Vous ne pouvez pas créer plusieurs comptes avec la même adresse e-mail. Souhaitez-vous vous connecter ?'
+                  : 'You cannot create multiple accounts with the same email. Would you like to log in instead?',
+              style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.4),
+            ),
+          ],
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              isFr ? 'Modifier' : 'Change',
+              style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => LoginScreen(prefilledEmail: email)),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2563EB),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text(
+              isFr ? 'Se connecter' : 'Log in',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -238,19 +406,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   },
                 ),
 
-                // Phone
-                _buildField(
+                // Phone with country code & strict Benin 10-digit validation
+                PhoneInputField(
+                  key: _phoneKey,
                   controller: _phoneController,
-                  label: isFr ? 'Numéro de téléphone' : 'Phone Number',
-                  hint: '+33 6 12 34 56 78',
-                  icon: Icons.phone_outlined,
-                  keyboardType: TextInputType.phone,
-                  validator: (val) {
-                    if (val == null || val.trim().isEmpty) {
-                      return isFr ? 'Le numéro est requis' : 'Phone is required';
-                    }
-                    return null;
-                  },
                 ),
 
                 // Password

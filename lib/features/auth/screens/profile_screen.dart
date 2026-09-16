@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -10,6 +12,7 @@ import '../../../core/providers/user_provider.dart';
 import '../../notifications/screens/notifications_modal.dart';
 import '../../rentals/providers/rental_provider.dart';
 import '../../rentals/screens/my_rentals_screen.dart';
+import '../../../core/widgets/phone_input_field.dart';
 import 'login_screen.dart';
 import 'register_screen.dart';
 
@@ -26,6 +29,17 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null && mounted) {
+        await context.read<UserProvider>().syncUserAvatar(user.uid);
+      }
+    });
+  }
+
   // Security Preferences
   bool _biometricEnabled = true;
   bool _twoFactorEnabled = false;
@@ -83,23 +97,58 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final picker = ImagePicker();
       final picked = await picker.pickImage(
         source: source,
-        maxWidth: 800,
-        maxHeight: 800,
-        imageQuality: 85,
+        maxWidth: 500,
+        maxHeight: 500,
+        imageQuality: 75,
       );
 
       if (picked != null) {
+        final bytes = await picked.readAsBytes();
+        final base64String = base64Encode(bytes);
+
+        // Copier dans le dossier permanent de l'app avec timestamp unique pour invalider le cache Flutter
+        String permanentPath = picked.path;
+        try {
+          final appDir = await getApplicationDocumentsDirectory();
+          final avatarsDir = Directory('${appDir.path}/avatars');
+          if (!await avatarsDir.exists()) await avatarsDir.create(recursive: true);
+          final user = FirebaseAuth.instance.currentUser;
+          final uid = user?.uid ?? 'local';
+          // Supprimer les anciens avatars locaux de cet utilisateur
+          for (final f in avatarsDir.listSync()) {
+            if (f is File && f.path.contains('avatar_$uid')) {
+              try {
+                f.deleteSync();
+              } catch (_) {}
+            }
+          }
+          final timestamp = DateTime.now().millisecondsSinceEpoch;
+          final fileName = 'avatar_${uid}_$timestamp.jpg';
+          final permanentFile = await File(picked.path).copy('${avatarsDir.path}/$fileName');
+          permanentPath = permanentFile.path;
+        } catch (_) {}
+
         if (mounted) {
-          context.read<UserProvider>().setCustomAvatarFile(File(picked.path));
+          // Vider le cache mémoire Flutter pour forcer le rafraîchissement immédiat de l'UI
+          PaintingBinding.instance.imageCache.clear();
+          PaintingBinding.instance.imageCache.clearLiveImages();
+          try {
+            await FileImage(File(permanentPath)).evict();
+          } catch (_) {}
+
+          if (!mounted) return;
+          context.read<UserProvider>().setCustomAvatarBytes(bytes, filePath: permanentPath);
           try {
             final user = FirebaseAuth.instance.currentUser;
             if (user != null) {
-              FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-                'avatarPath': picked.path,
+              await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+                'avatarBase64': base64String,
+                'avatarPath': permanentPath,
                 'avatarColorHex': null,
               }, SetOptions(merge: true));
             }
           } catch (_) {}
+          if (!mounted) return;
           final isFr = context.read<LanguageProvider>().isFrench;
           _showSnack(isFr ? 'Photo de profil mise à jour avec succès !' : 'Profile photo updated successfully!');
         }
@@ -166,9 +215,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: avatarPresets.map((preset) {
                     final color = preset['color'] as Color;
-                    final isSelected = user.avatarColor == color && user.customAvatarFile == null;
+                    final isSelected = user.avatarColor == color && !user.hasCustomAvatar;
                     return GestureDetector(
                       onTap: () {
+                        PaintingBinding.instance.imageCache.clear();
+                        PaintingBinding.instance.imageCache.clearLiveImages();
                         context.read<UserProvider>().setAvatarColor(color);
                         try {
                           final user = FirebaseAuth.instance.currentUser;
@@ -176,6 +227,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             FirebaseFirestore.instance.collection('users').doc(user.uid).set({
                               'avatarColorHex': color.toARGB32(),
                               'avatarPath': '',
+                              'avatarBase64': '',
                             }, SetOptions(merge: true));
                           }
                         } catch (_) {}
@@ -260,7 +312,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   },
                 ),
 
-                if (user.customAvatarFile != null)
+                if (user.hasCustomAvatar)
                   ListTile(
                     leading: Container(
                       padding: const EdgeInsets.all(8),
@@ -275,12 +327,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFFEF4444)),
                     ),
                     onTap: () {
-                      context.read<UserProvider>().setCustomAvatarFile(null);
+                      PaintingBinding.instance.imageCache.clear();
+                      PaintingBinding.instance.imageCache.clearLiveImages();
+                      context.read<UserProvider>().setCustomAvatarBytes(null, filePath: null);
                       try {
                         final user = FirebaseAuth.instance.currentUser;
                         if (user != null) {
                           FirebaseFirestore.instance.collection('users').doc(user.uid).set({
                             'avatarPath': '',
+                            'avatarBase64': '',
                           }, SetOptions(merge: true));
                         }
                       } catch (_) {}
@@ -305,6 +360,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final emailCtrl = TextEditingController(text: user.email);
     final phoneCtrl = TextEditingController(text: user.phone);
     final locationCtrl = TextEditingController(text: user.location);
+    final phoneKey = GlobalKey<PhoneInputFieldState>();
 
     showModalBottomSheet(
       context: context,
@@ -378,11 +434,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   keyboardType: TextInputType.emailAddress,
                 ),
                 const SizedBox(height: 12),
-                _buildFormField(
-                  label: isFr ? 'Numéro de téléphone' : 'Phone Number',
+                PhoneInputField(
+                  key: phoneKey,
                   controller: phoneCtrl,
-                  icon: Icons.phone_outlined,
-                  keyboardType: TextInputType.phone,
                 ),
                 const SizedBox(height: 12),
                 _buildFormField(
@@ -398,9 +452,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: ElevatedButton(
                     onPressed: () async {
                       if (nameCtrl.text.trim().isEmpty) return;
+                      final digits = phoneCtrl.text.replaceAll(RegExp(r'\D'), '');
+                      final country = phoneKey.currentState?.selectedCountry;
+                      if (country != null && country.code == 'BJ' && digits.isNotEmpty) {
+                        if (digits.length != 10 || !digits.startsWith('01')) {
+                          _showSnack(isFr ? 'Au Bénin, le numéro doit comporter 10 chiffres (commençant par 01)' : 'In Benin, phone must have 10 digits (starting with 01)');
+                          return;
+                        }
+                      }
                       final updatedName = nameCtrl.text.trim();
                       final updatedEmail = emailCtrl.text.trim();
-                      final updatedPhone = phoneCtrl.text.trim();
+                      final updatedPhone = phoneKey.currentState?.fullPhoneNumber ?? phoneCtrl.text.trim();
                       final updatedLocation = locationCtrl.text.trim();
 
                       context.read<UserProvider>().updateProfile(
@@ -859,6 +921,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   await FirebaseAuth.instance.signOut();
                 } catch (_) {}
                 if (!mounted) return;
+                // Vider les réservations Firestore de la session
+                await context.read<RentalProvider>().onUserLoggedOut();
+                if (!mounted) return;
                 context.read<UserProvider>().reset();
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -928,6 +993,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 } catch (e) {
                   debugPrint('Account deletion notice: $e');
                 }
+                if (!mounted) return;
+                await context.read<RentalProvider>().onUserLoggedOut();
                 if (!mounted) return;
                 context.read<UserProvider>().reset();
                 Navigator.of(context).pushAndRemoveUntil(
@@ -1165,10 +1232,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: Stack(
                       children: [
                         CircleAvatar(
+                          key: ValueKey(user.customAvatarBytes.hashCode ^ (user.customAvatarPath?.hashCode ?? 0) ^ user.avatarColor.toARGB32()),
                           radius: 46,
                           backgroundColor: user.avatarColor,
-                          backgroundImage: user.customAvatarFile != null ? FileImage(user.customAvatarFile!) : null,
-                          child: user.customAvatarFile == null
+                          backgroundImage: user.customAvatarBytes != null
+                              ? MemoryImage(user.customAvatarBytes!)
+                              : null,
+                          child: !user.hasCustomAvatar
                               ? Text(
                                   user.avatarInitials,
                                   style: const TextStyle(

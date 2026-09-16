@@ -41,6 +41,7 @@ dependencies:
   firebase_auth: ^6.0.0
   cloud_firestore: ^6.0.0
   cloud_functions: ^6.0.0
+  path_provider: ^2.1.5
 
 dependency_overrides:
   firebase_core_web: 3.10.0

@@ -56,7 +56,7 @@ class BookingConfirmationScreen extends StatelessWidget {
       endDate: end,
       duration: durationHours,
       totalPrice: totalPrice,
-      status: RentalStatus.pending,
+      status: RentalStatus.confirmed,
       createdAt: now,
     );
   }

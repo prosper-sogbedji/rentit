@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/language_provider.dart';
@@ -8,7 +9,8 @@ import '../../notifications/screens/notifications_modal.dart';
 import 'item_details_screen.dart';
 
 class ExploreScreen extends StatefulWidget {
-  const ExploreScreen({super.key});
+  final bool openSearchOnStart;
+  const ExploreScreen({super.key, this.openSearchOnStart = false});
 
   @override
   State<ExploreScreen> createState() => _ExploreScreenState();
@@ -17,6 +19,7 @@ class ExploreScreen extends StatefulWidget {
 class _ExploreScreenState extends State<ExploreScreen> {
   int _selectedCategoryIndex = 0;
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
   String _sortBy = 'recommended';
   double _maxPrice = 150.0;
@@ -26,10 +29,21 @@ class _ExploreScreenState extends State<ExploreScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final userLoc = context.read<UserProvider>().location;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final userProv = context.read<UserProvider>();
+      final userLoc = userProv.location;
       if (userLoc.isNotEmpty && mounted) {
         setState(() => _currentLocation = userLoc);
+      }
+      if (!userProv.hasCustomAvatar) {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null && mounted) {
+          await userProv.syncUserAvatar(user.uid);
+        }
+      }
+      // Auto-focus la recherche si on est sur l'onglet Search
+      if (widget.openSearchOnStart && mounted) {
+        _searchFocusNode.requestFocus();
       }
     });
   }
@@ -37,6 +51,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -808,10 +823,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       );
                     },
                     child: CircleAvatar(
+                      key: ValueKey(user.customAvatarBytes.hashCode ^ (user.customAvatarPath?.hashCode ?? 0) ^ user.avatarColor.toARGB32()),
                       radius: 16,
                       backgroundColor: user.avatarColor,
-                      backgroundImage: user.customAvatarFile != null ? FileImage(user.customAvatarFile!) : null,
-                      child: user.customAvatarFile == null
+                      backgroundImage: user.customAvatarBytes != null
+                          ? MemoryImage(user.customAvatarBytes!)
+                          : null,
+                      child: !user.hasCustomAvatar
                           ? Text(
                               user.avatarInitials,
                               style: const TextStyle(
@@ -857,6 +875,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                           Expanded(
                             child: TextField(
                               controller: _searchController,
+                              focusNode: _searchFocusNode,
                               onChanged: (val) => setState(() => _searchQuery = val),
                               decoration: InputDecoration(
                                 hintText: lang.t('search_hint'),

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../../models/rental_model.dart';
 import 'model_codec.dart';
 import 'service_client.dart';
@@ -113,10 +114,10 @@ class RentalService {
           'requestId': requestId,
           'expectedPricePerHourCents': expectedPricePerHourCents,
         });
-        return ModelCodec.rental(res);
+        return RentalModel.fromMap(res, docId: requestId);
       } catch (_) {}
     }
-    return ModelCodec.rental(rentalMap);
+    return RentalModel.fromMap(rentalMap, docId: requestId);
   });
 
   Future<RentalModel> get(String id) => serviceCall(
@@ -129,13 +130,21 @@ class RentalService {
       client.firestore
           .collection('rentals')
           .where('userId', isEqualTo: uid)
-          .orderBy('createdAt', descending: true)
           .snapshots()
-          .map(
-            (snapshot) => snapshot.docs
-                .map((doc) => ModelCodec.rental({...doc.data(), 'id': doc.id}))
-                .toList(),
-          ),
+          .map((snapshot) {
+            final list = <RentalModel>[];
+            for (final doc in snapshot.docs) {
+              try {
+                final data = doc.data();
+                list.add(RentalModel.fromMap(data, docId: doc.id));
+              } catch (e) {
+                debugPrint('Rental doc parse notice: $e');
+              }
+            }
+            // Tri en Dart côté client — aucun index composite Firestore requis !
+            list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+            return list;
+          }),
     );
   }
 
