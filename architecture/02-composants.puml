@@ -1,0 +1,40 @@
+@startuml
+title RentIt — Responsabilités interfaces / backend
+skinparam componentStyle rectangle
+package "Application Flutter" {
+  [Écrans auth, catalogue, réservation, locations] as UI
+  [Modèles et contrats Dart] as Models
+  package "lib/core/services/ (implémentation future)" {
+    [AuthService] as AuthService
+    [CatalogueService] as CatalogueService
+    [RentalService] as RentalService
+    [AdminService] as AdminService
+  }
+}
+cloud "Firebase" {
+  [Firebase Authentication] as Auth
+  [Firestore Security Rules] as Rules
+  database "Cloud Firestore" as DB
+  [Cloud Functions callable\nvalidation, prix, disponibilité, mutations] as Functions
+}
+UI --> Models
+UI --> AuthService
+UI --> CatalogueService
+UI --> RentalService
+UI --> AdminService
+AuthService --> Auth : inscription / connexion / session
+AuthService --> Functions : création du profil / édition autorisée
+CatalogueService --> Rules : lectures catalogue
+RentalService --> Rules : suivi des réservations du propriétaire
+Rules --> DB : accès filtrés
+AdminService --> Functions : CRUD catalogue / confirmation / clôture
+RentalService --> Functions : devis / disponibilité / réserver / statut
+Functions --> Auth : identité et rôle vérifiés
+Functions --> DB : transactions via Admin SDK
+note bottom of Functions
+  Proposition pour l'étape d'implémentation : environnement serveur
+  de confiance pour les mutations sensibles. Les règles Firestore
+  ne s'appliquent pas à l'Admin SDK : contrôler chaque appel ici.
+  Aucun secret administrateur dans Flutter.
+end note
+@enduml

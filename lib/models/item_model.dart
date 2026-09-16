@@ -1,3 +1,5 @@
+enum ItemStatus { available, unavailable, maintenance }
+
 class ItemModel {
   final String id;
   final String name;
@@ -6,7 +8,7 @@ class ItemModel {
   final String imageUrl;
   final double pricePerDay;
   final int quantity;
-  final String status; // 'available', 'unavailable', 'maintenance'
+  final ItemStatus status;
   final DateTime createdAt;
 
   const ItemModel({
@@ -17,7 +19,7 @@ class ItemModel {
     required this.imageUrl,
     required this.pricePerDay,
     required this.quantity,
-    this.status = 'available',
+    this.status = ItemStatus.available,
     required this.createdAt,
   });
 
@@ -29,7 +31,7 @@ class ItemModel {
     String? imageUrl,
     double? pricePerDay,
     int? quantity,
-    String? status,
+    ItemStatus? status,
     DateTime? createdAt,
   }) {
     return ItemModel(
@@ -54,7 +56,7 @@ class ItemModel {
       'imageUrl': imageUrl,
       'pricePerDay': pricePerDay,
       'quantity': quantity,
-      'status': status,
+      'status': status.name,
       'createdAt': createdAt.toIso8601String(),
     };
   }
@@ -68,13 +70,16 @@ class ItemModel {
       imageUrl: map['imageUrl'] ?? '',
       pricePerDay: (map['pricePerDay'] as num?)?.toDouble() ?? 0.0,
       quantity: (map['quantity'] as num?)?.toInt() ?? 1,
-      status: map['status'] ?? 'available',
+      status: ItemStatus.values.firstWhere(
+        (status) => status.name == map['status'],
+        orElse: () => ItemStatus.available,
+      ),
       createdAt: map['createdAt'] != null
           ? (map['createdAt'] is String
-              ? DateTime.tryParse(map['createdAt']) ?? DateTime.now()
-              : (map['createdAt'].toDate != null
-                  ? map['createdAt'].toDate()
-                  : DateTime.now()))
+                ? DateTime.tryParse(map['createdAt']) ?? DateTime.now()
+                : (map['createdAt'].toDate != null
+                      ? map['createdAt'].toDate()
+                      : DateTime.now()))
           : DateTime.now(),
     );
   }

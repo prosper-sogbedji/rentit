@@ -1,12 +1,14 @@
+enum RentalStatus { pending, confirmed, completed, cancelled }
+
 class RentalModel {
   final String id;
   final String userId;
   final String itemId;
   final DateTime startDate;
   final DateTime endDate;
-  final int duration; // in days
+  final int duration; // in hours
   final double totalPrice;
-  final String status; // 'pending', 'confirmed', 'completed', 'cancelled'
+  final RentalStatus status;
   final DateTime createdAt;
 
   const RentalModel({
@@ -17,7 +19,7 @@ class RentalModel {
     required this.endDate,
     required this.duration,
     required this.totalPrice,
-    this.status = 'pending',
+    this.status = RentalStatus.pending,
     required this.createdAt,
   });
 
@@ -29,7 +31,7 @@ class RentalModel {
     DateTime? endDate,
     int? duration,
     double? totalPrice,
-    String? status,
+    RentalStatus? status,
     DateTime? createdAt,
   }) {
     return RentalModel(
@@ -54,7 +56,7 @@ class RentalModel {
       'endDate': endDate.toIso8601String(),
       'duration': duration,
       'totalPrice': totalPrice,
-      'status': status,
+      'status': status.name,
       'createdAt': createdAt.toIso8601String(),
     };
   }
@@ -62,9 +64,14 @@ class RentalModel {
   factory RentalModel.fromMap(Map<String, dynamic> map, {String? docId}) {
     DateTime parseDate(dynamic val) {
       if (val == null) return DateTime.now();
+      if (val is DateTime) return val;
       if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
-      if (val.toDate != null) return val.toDate();
-      return DateTime.now();
+      if (val is int) return DateTime.fromMillisecondsSinceEpoch(val);
+      try {
+        return (val as dynamic).toDate() as DateTime;
+      } catch (_) {
+        return DateTime.now();
+      }
     }
 
     return RentalModel(
@@ -75,7 +82,10 @@ class RentalModel {
       endDate: parseDate(map['endDate']),
       duration: (map['duration'] as num?)?.toInt() ?? 1,
       totalPrice: (map['totalPrice'] as num?)?.toDouble() ?? 0.0,
-      status: map['status'] ?? 'pending',
+      status: RentalStatus.values.firstWhere(
+        (status) => status.name == map['status'],
+        orElse: () => RentalStatus.pending,
+      ),
       createdAt: parseDate(map['createdAt']),
     );
   }
